@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>10 秒狂點小遊戲（多人版）</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .page {
+      display: flex;
+      gap: 16px;
+      max-width: 900px;
+      width: 100%;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .game-container,
+    .side-panel {
+      background: #ffffff;
+      padding: 20px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .game-container {
+      flex: 2;
+      text-align: center;
+    }
+
+    .side-panel {
+      flex: 1.2;
+      font-size: 14px;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 24px;
+    }
+
+    .info {
+      margin-bottom: 16px;
+      color: #555;
+      font-size: 14px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+
+    .status-label {
+      font-weight: bold;
+      color: #333;
+    }
+
+    .status-value {
+      font-size: 22px;
+      color: #007bff;
+    }
+
+    #clickBtn {
+      font-size: 20px;
+      padding: 12px 32px;
+      border: none;
+      border-radius: 8px;
+      background-color: #28a745;
+      color: white;
+      cursor: pointer;
+      transition: transform 0.05s ease, box-shadow 0.05s ease,
+        background-color 0.2s ease;
+      margin-bottom: 8px;
+    }
+
+    #clickBtn:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) inset;
+    }
+
+    #clickBtn:disabled {
+      background-color: #aaaaaa;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    #startBtn, #resetBtn {
+      font-size: 14px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #666;
+      background: #ffffff;
+      cursor: pointer;
+      margin: 4px;
+    }
+
+    #result {
+      margin-top: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #d9534f;
+      min-height: 24px;
+    }
+
+    .nickname-box {
+      margin-bottom: 10px;
+    }
+
+    .nickname-box input {
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      width: 60%;
+      max-width: 220px;
+    }
+
+    .nickname-box button {
+      padding: 6px 10px;
+      margin-left: 6px;
+      border-radius: 6px;
+      border: none;
+      background-color: #007bff;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .nickname-hint {
+      font-size: 12px;
+      color: #777;
+      margin-top: 4px;
+    }
+
+    .side-section {
+      margin-bottom: 16px;
+    }
+
+    .side-section h2 {
+      font-size: 16px;
+      margin: 0 0 8px 0;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 4px;
+    }
+
+    .leaderboard-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .leaderboard-list li {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+      border-bottom: 1px dashed #eee;
+    }
+
+    .leaderboard-name {
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .online-count {
+      font-size: 24px;
+      font-weight: bold;
+      color: #17a2b8;
+    }
+
+    .highlight-score {
+      font-weight: bold;
+      color: #e67e22;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- 左邊：遊戲區 -->
+    <div class="game-container">
+      <h1>10 秒狂點小遊戲（多人版）</h1>
+      <div class="info">
+        規則：在 <strong>10 秒</strong> 內，瘋狂按「點我」累積分數。<br />
+        成績會上傳到雲端，和所有同學一起比排行。<br />
+        <strong>先輸入暱稱，再按「開始遊戲」，倒數才會啟動。</strong>
+      </div>
+
+      <!-- 暱稱輸入 -->
+      <div class="nickname-box">
+        <input
+          id="nicknameInput"
+          type="text"
+          placeholder="請輸入你的暱稱"
+        />
+        <button id="saveNicknameBtn">確定</button>
+        <div class="nickname-hint" id="nicknameHint">
+          還沒設定暱稱，無法記錄成績。
+        </div>
+      </div>
+
+      <div class="status-row">
+        <div>
+          <div class="status-label">剩餘時間</div>
+          <div id="time" class="status-value">10</div>
+        </div>
+        <div>
+          <div class="status-label">目前分數</div>
+          <div id="score" class="status-value">0</div>
+        </div>
+      </div>
+
+      <button id="clickBtn" disabled>點我</button>
+      <br />
+      <button id="startBtn">開始遊戲</button>
+      <button id="resetBtn">重設</button>
+
+      <div id="result"></div>
+    </div>
+
+    <!-- 右邊：即時資訊 / 排行榜 -->
+    <div class="side-panel">
+      <div class="side-section">
+        <h2>在線資訊</h2>
+        <div>目前在線人數：</div>
+        <div id="onlineCount" class="online-count">0</div>
+      </div>
+
+      <div class="side-section">
+        <h2>最高分紀錄</h2>
+        <div id="bestScoreText">尚無資料</div>
+      </div>
+
+      <div class="side-section">
+        <h2>排行榜 Top 10</h2>
+        <ul id="leaderboard" class="leaderboard-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase v8 CDN 版本（搭配 Realtime Database） -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <script>
+    /******************************
+     * 1. Firebase 初始化設定
+     ******************************/
+    const firebaseConfig = {
+      apiKey: "AIzaSyCcTZY_Fike_D_Dnav9SnaLpwLziEQeu8s",
+      authDomain: "click-game-ad813.firebaseapp.com",
+      projectId: "click-game-ad813",
+      storageBucket: "click-game-ad813.firebasestorage.app",
+      messagingSenderId: "738808291812",
+      appId: "1:738808291812:web:c60d1125397d1c7be3e7f1",
+      measurementId: "G-JK5M4VCQDT",
+      // Realtime Database 連線用：預設網址規則
+      databaseURL: "https://click-game-ad813-default-rtdb.firebaseio.com"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // 玩家在線狀態：建立一個隨機 ID
+    const userId = "user_" + Math.random().toString(36).slice(2);
+    let currentNickname = "";
+    const onlineRef = db.ref("onlineUsers/" + userId);
+
+    /******************************
+     * 2. 遊戲邏輯變數
+     ******************************/
+    let timeLeft = 10;
+    let score = 0;
+    let timerId = null;
+    let isGameStarted = false;
+
+    const timeDisplay = document.getElementById("time");
+    const scoreDisplay = document.getElementById("score");
+    const clickBtn = document.getElementById("clickBtn");
+    const startBtn = document.getElementById("startBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const resultDiv = document.getElementById("result");
+
+    const nicknameInput = document.getElementById("nicknameInput");
+    const saveNicknameBtn = document.getElementById("saveNicknameBtn");
+    const nicknameHint = document.getElementById("nicknameHint");
+
+    const onlineCountEl = document.getElementById("onlineCount");
+    const leaderboardEl = document.getElementById("leaderboard");
+    const bestScoreText = document.getElementById("bestScoreText");
+
+    /******************************
+     * 3. 暱稱與在線狀態設定
+     ******************************/
+    // 儲存暱稱按鈕
+    saveNicknameBtn.addEventListener("click", function () {
+      const name = nicknameInput.value.trim();
+      if (!name) {
+        alert("請先輸入暱稱");
+        return;
+      }
+      currentNickname = name;
+      nicknameHint.textContent = "暱稱已設定為：「" + currentNickname + "」";
+      nicknameHint.style.color = "#28a745";
+
+      // 設定在線資料
+      onlineRef
+        .set({
+          name: currentNickname,
+          lastActive: firebase.database.ServerValue.TIMESTAMP
+        })
+        .catch(console.error);
+
+      // 離線時自動刪除此節點
+      onlineRef.onDisconnect().remove();
+
+      // 啟用遊戲按鈕
+      startBtn.disabled = false;
+    });
+
+    // 定期更新 lastActive，讓在線人數比較即時
+    setInterval(function () {
+      if (currentNickname) {
+        onlineRef.update({
+          lastActive: firebase.database.ServerValue.TIMESTAMP
+        });
+      }
+    }, 10000); // 每 10 秒更新一次
+
+    /******************************
+     * 4. 遊戲按鈕事件
+     ******************************/
+    // 點擊「點我」累積分數
+    clickBtn.addEventListener("click", function () {
+      if (!isGameStarted || timeLeft <= 0) return;
+
+      score++;
+      scoreDisplay.textContent = score;
+    });
+
+    // 「開始遊戲」按鈕
+    startBtn.addEventListener("click", function () {
+      if (!currentNickname) {
+        alert("請先輸入暱稱，才能開始遊戲與記錄成績！");
+        return;
+      }
+      if (isGameStarted) return; // 避免重複開始
+
+      startGame();
+    });
+
+    // 「重設」按鈕
+    resetBtn.addEventListener("click", function () {
+      resetGame();
+    });
+
+    /******************************
+     * 5. 遊戲邏輯函式
+     ******************************/
+    function startGame() {
+      isGameStarted = true;
+      resultDiv.textContent = "";
+      score = 0;
+      timeLeft = 10;
+      scoreDisplay.textContent = score;
+      timeDisplay.textContent = timeLeft;
+
+      clickBtn.disabled = false;
+      startBtn.disabled = true; // 開始後禁止再按開始
+
+      timerId = setInterval(function () {
+        timeLeft--;
+        if (timeLeft < 0) {
+          timeLeft = 0;
+        }
+        timeDisplay.textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function endGame() {
+      clearInterval(timerId);
+      timerId = null;
+      isGameStarted = false;
+      clickBtn.disabled = true;
+      startBtn.disabled = false;
+
+      resultDiv.textContent = "你的成績是：" + score + " 次";
+
+      // 把成績寫入 Firebase
+      if (currentNickname && score > 0) {
+        const scoresRef = db.ref("scores");
+        scoresRef
+          .push({
+            name: currentNickname,
+            score: score,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+          })
+          .catch(console.error);
+      }
+    }
+
+    function resetGame() {
+      if (timerId !== null) {
+        clearInterval(timerId);
+      }
+
+      timeLeft = 10;
+      score = 0;
+      isGameStarted = false;
+
+      timeDisplay.textContent = timeLeft;
+      scoreDisplay.textContent = score;
+      clickBtn.disabled = true;
+      startBtn.disabled = !currentNickname; // 有暱稱才允許開始
+      resultDiv.textContent = "";
+    }
+
+    /******************************
+     * 6. 即時監聽：在線人數
+     ******************************/
+    db.ref("onlineUsers").on("value", function (snapshot) {
+      const data = snapshot.val() || {};
+      const ids = Object.keys(data);
+      onlineCountEl.textContent = ids.length.toString();
+    });
+
+    /******************************
+     * 7. 即時監聽：排行榜 Top 10
+     ******************************/
+    const scoresRef = db.ref("scores");
+
+    // 按分數排序，抓最後 10 筆（分數較高）
+    scoresRef.orderByChild("score").limitToLast(10).on("value", function (snapshot) {
+      const list = [];
+      snapshot.forEach(function (child) {
+        list.push(child.val());
+      });
+
+      // limitToLast 會由小到大回來，所以反轉成由大到小
+      list.sort(function (a, b) {
+        return b.score - a.score;
+      });
+
+      renderLeaderboard(list);
+      renderBestScore(list);
+    });
+
+    function renderLeaderboard(list) {
+      leaderboardEl.innerHTML = "";
+      list.forEach(function (item, index) {
+        const li = document.createElement("li");
+        const rank = index + 1;
+        li.innerHTML =
+          '<span class="leaderboard-name">' +
+          rank +
+          ". " +
+          escapeHtml(item.name || "匿名") +
+          '</span><span class="highlight-score">' +
+          item.score +
+          " 次</span>";
+        leaderboardEl.appendChild(li);
+      });
+
+      if (list.length === 0) {
+        leaderboardEl.innerHTML = "<li>尚無成績資料</li>";
+      }
+    }
+
+    function renderBestScore(list) {
+      if (!list || list.length === 0) {
+        bestScoreText.textContent = "尚無資料";
+        return;
+      }
+      const top = list[0];
+      bestScoreText.innerHTML =
+        '目前最高分：<span class="highlight-score">' +
+        top.score +
+        " 次</span>（" +
+        escapeHtml(top.name || "匿名") +
+        "）";
+    }
+
+    // 簡單的 HTML escape，避免暱稱裡有奇怪符號
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // 初始狀態：還沒暱稱 → 禁用開始 / 點擊
+    clickBtn.disabled = true;
+    startBtn.disabled = true;
+  </script>
+</body>
+</html>
