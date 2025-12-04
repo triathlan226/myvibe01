@@ -1,0 +1,124 @@
+body {
+    font-family: "Microsoft JhengHei", sans-serif;
+    background-color: #f3f3f3;
+    text-align: center;
+    margin: 0;
+    padding: 20px;
+}
+
+h1 {
+    margin-bottom: 10px;
+}
+
+#info {
+    margin-bottom: 8px;
+    font-size: 18px;
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+}
+
+#difficulty-row {
+    margin-bottom: 12px;
+    font-size: 16px;
+}
+
+#difficulty {
+    padding: 4px 8px;
+    font-size: 14px;
+}
+
+/* 遊戲區域 */
+#game-area {
+    position: relative;
+    margin: 0 auto;
+    width: 400px;
+    height: 400px;
+    background-color: #ffffff;
+    border: 2px solid #333;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* 玩家角色（籃子） */
+#basket {
+    position: absolute;
+    bottom: 10px;
+    width: 70px;
+    height: 30px;
+    background: linear-gradient(135deg, #ff9800, #ffb74d);
+    border-radius: 50% 50% 40% 40%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* 碰撞動畫 */
+#basket.hit {
+    animation: hitFlash 0.2s ease-out;
+}
+
+@keyframes hitFlash {
+    0%   { transform: scale(1); box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+    50%  { transform: scale(1.15); box-shadow: 0 0 12px rgba(255,255,255,0.9); }
+    100% { transform: scale(1); box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+}
+
+/* 掉落物 */
+.falling-item {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* 控制區 */
+#controls {
+    margin-top: 15px;
+}
+
+button {
+    padding: 10px 18px;
+    font-size: 16px;
+    border: none;
+    background-color: #2196f3;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #1976d2;
+}
+
+#message {
+    margin-top: 15px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+/* 排行榜 */
+#leaderboard {
+    margin-top: 25px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: left;
+    background: #ffffff;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+#leaderboard h2 {
+    margin-top: 0;
+    text-align: center;
+}
+
+#leaderboard-list {
+    padding-left: 20px;
+}
+
+#leaderboard-list li {
+    margin-bottom: 4px;
+    font-size: 15px;
+}

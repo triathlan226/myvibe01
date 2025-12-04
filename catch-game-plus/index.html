@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>掉落物接接樂 Catch Game Plus</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <h1>掉落物接接樂 Catch Game Plus</h1>
+
+    <div id="info">
+        <span>分數：<span id="score">0</span></span>
+        <span>最高分：<span id="best-score">0</span></span>
+        <span>剩餘時間：<span id="time">30</span> 秒</span>
+    </div>
+
+    <div id="difficulty-row">
+        難度：
+        <select id="difficulty">
+            <option value="easy">簡單</option>
+            <option value="normal" selected>普通</option>
+            <option value="hard">困難</option>
+        </select>
+    </div>
+
+    <div id="game-area">
+        <div id="basket"></div>
+    </div>
+
+    <div id="controls">
+        <button id="start-btn">開始遊戲</button>
+        <p>操作方式：使用鍵盤 ← → 或 A / D 移動籃子接住掉落物。</p>
+        <p>綠色：+1 分、黃色：+3 分、紅色：-1 分（要小心！）</p>
+    </div>
+
+    <p id="message"></p>
+
+    <section id="leaderboard">
+        <h2>排行榜（Top 5）</h2>
+        <ol id="leaderboard-list">
+            <!-- 由 JavaScript 動態填入 -->
+        </ol>
+    </section>
+
+    <!-- 音效（請自行放入 sounds 資料夾中的 mp3 / wav 檔） -->
+    <audio id="snd-catch" src="sounds/catch.mp3"></audio>
+    <audio id="snd-bad" src="sounds/bad.mp3"></audio>
+    <audio id="snd-gameover" src="sounds/gameover.mp3"></audio>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
