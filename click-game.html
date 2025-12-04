@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>10 秒狂點小遊戲</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .game-container {
+      background: #ffffff;
+      padding: 24px 32px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 24px;
+    }
+
+    .info {
+      margin-bottom: 16px;
+      color: #555;
+      font-size: 14px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+
+    .status-label {
+      font-weight: bold;
+      color: #333;
+    }
+
+    .status-value {
+      font-size: 22px;
+      color: #007bff;
+    }
+
+    #clickBtn {
+      font-size: 20px;
+      padding: 12px 32px;
+      border: none;
+      border-radius: 8px;
+      background-color: #28a745;
+      color: white;
+      cursor: pointer;
+      transition: transform 0.05s ease, box-shadow 0.05s ease,
+        background-color 0.2s ease;
+    }
+
+    #clickBtn:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) inset;
+    }
+
+    #clickBtn:disabled {
+      background-color: #aaaaaa;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    #result {
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #d9534f;
+      min-height: 24px;
+    }
+
+    #resetBtn {
+      margin-top: 12px;
+      font-size: 14px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #666;
+      background: #ffffff;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>10 秒狂點小遊戲</h1>
+    <div class="info">
+      規則：在 <strong>10 秒</strong> 內，瘋狂按下面的按鈕，
+      看看你可以按幾次！<br />
+      第一次按「點我」時遊戲就會開始倒數。
+    </div>
+
+    <div class="status-row">
+      <div>
+        <div class="status-label">剩餘時間</div>
+        <div id="time" class="status-value">10</div>
+      </div>
+      <div>
+        <div class="status-label">目前分數</div>
+        <div id="score" class="status-value">0</div>
+      </div>
+    </div>
+
+    <button id="clickBtn">點我</button>
+
+    <div id="result"></div>
+    <button id="resetBtn">重新開始</button>
+  </div>
+
+  <script>
+    let timeLeft = 10;
+    let score = 0;
+    let timerId = null;
+    let isGameStarted = false;
+
+    const timeDisplay = document.getElementById("time");
+    const scoreDisplay = document.getElementById("score");
+    const clickBtn = document.getElementById("clickBtn");
+    const resultDiv = document.getElementById("result");
+    const resetBtn = document.getElementById("resetBtn");
+
+    clickBtn.addEventListener("click", function () {
+      if (!isGameStarted) {
+        startGame();
+      }
+      if (timeLeft > 0) {
+        score++;
+        scoreDisplay.textContent = score;
+      }
+    });
+
+    resetBtn.addEventListener("click", function () {
+      resetGame();
+    });
+
+    function startGame() {
+      isGameStarted = true;
+      resultDiv.textContent = "";
+
+      timerId = setInterval(function () {
+        timeLeft--;
+        if (timeLeft < 0) {
+          timeLeft = 0;
+        }
+        timeDisplay.textContent = timeLeft;
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function endGame() {
+      clearInterval(timerId);
+      clickBtn.disabled = true;
+      resultDiv.textContent = "你的成績是：" + score + " 次";
+    }
+
+    function resetGame() {
+      if (timerId !== null) {
+        clearInterval(timerId);
+      }
+      timeLeft = 10;
+      score = 0;
+      isGameStarted = false;
+
+      timeDisplay.textContent = timeLeft;
+      scoreDisplay.textContent = score;
+      clickBtn.disabled = false;
+      resultDiv.textContent = "";
+    }
+  </script>
+</body>
+</html>
