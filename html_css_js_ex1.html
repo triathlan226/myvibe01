@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>我的第一個網頁</title>
+
+  <style>
+    body {
+      background: linear-gradient(120deg, #1e3c72, #2a5298);
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      padding-top: 60px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>我的第一個網頁</h1>
+  <p>我正在學 vibe coding！</p>
+  <img src="me.jpg" width="200">
+
+  <br><br>
+  <button id="btn">點我改變背景顏色</button>
+
+  <script>
+    document.getElementById("btn").addEventListener("click", function(){
+      document.body.style.background =
+        "#" + Math.floor(Math.random()*16777215).toString(16);
+    });
+  </script>
+</body>
+</html>
