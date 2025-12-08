@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超簡單點擊遊戲</title>
+    <style>
+        /* CSS 樣式 */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            user-select: none; /* 防止文字被選取 */
+        }
+
+        #game-container {
+            width: 500px;
+            height: 300px;
+            border: 5px solid #333;
+            background-color: #fff;
+            position: relative; /* 讓子元素可以絕對定位 */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            overflow: hidden; /* 確保按鈕不會跑出邊界 */
+        }
+
+        #score-display {
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        #target-button {
+            position: absolute; /* 絕對定位，方便移動 */
+            width: 80px;
+            height: 80px;
+            background-color: #ff6347; /* 番茄紅 */
+            color: white;
+            border: none;
+            border-radius: 50%; /* 圓形按鈕 */
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.1s ease-out; /* 平滑的移動動畫 */
+            line-height: 80px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        #target-button:hover {
+            background-color: #e65c40;
+        }
+
+        #start-button {
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            margin-top: 20px;
+            background-color: #4CAF50; /* 綠色 */
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="score-display">分數: **0**</div>
+
+    <div id="game-container">
+        <button id="target-button" style="display: none;">點我!</button>
+    </div>
+
+    <button id="start-button">開始遊戲 (30秒)</button>
+
+    <script>
+        // JavaScript 邏輯
+        const scoreDisplay = document.getElementById('score-display');
+        const targetButton = document.getElementById('target-button');
+        const startButton = document.getElementById('start-button');
+        const gameContainer = document.getElementById('game-container');
+
+        let score = 0;
+        let gameTimer; // 用來儲存計時器的變數
+        const GAME_DURATION = 30000; // 遊戲時間 (30秒 = 30000毫秒)
+
+        // --- 核心函數 ---
+
+        /**
+         * 隨機生成按鈕在遊戲容器內的新位置
+         */
+        function moveTargetButton() {
+            // 獲取容器和按鈕的尺寸
+            const containerWidth = gameContainer.clientWidth;
+            const containerHeight = gameContainer.clientHeight;
+            const buttonSize = targetButton.clientWidth; // 寬度 (也是高度)
+
+            // 計算可移動的範圍
+            const maxX = containerWidth - buttonSize;
+            const maxY = containerHeight - buttonSize;
+
+            // 隨機生成 X 和 Y 座標
+            const newX = Math.floor(Math.random() * maxX);
+            const newY = Math.floor(Math.random() * maxY);
+
+            // 設定按鈕的位置
+            targetButton.style.left = `${newX}px`;
+            targetButton.style.top = `${newY}px`;
+        }
+
+        /**
+         * 處理按鈕被點擊時的邏輯
+         */
+        function handleButtonClick() {
+            // 1. 增加分數
+            score++;
+            scoreDisplay.innerHTML = `分數: **${score}**`;
+
+            // 2. 讓按鈕移動到新位置
+            moveTargetButton();
+        }
+
+        /**
+         * 遊戲結束時的邏輯
+         */
+        function endGame() {
+            // 隱藏按鈕
+            targetButton.style.display = 'none';
+
+            // 啟用開始按鈕
+            startButton.disabled = false;
+            startButton.textContent = '重新開始遊戲';
+
+            // 顯示最終得分
+            alert(`遊戲時間到！您的最終得分是: ${score}`);
+        }
+
+
+        /**
+         * 遊戲開始時的邏輯
+         */
+        function startGame() {
+            // 1. 重設分數
+            score = 0;
+            scoreDisplay.innerHTML = `分數: **0**`;
+
+            // 2. 顯示按鈕並設定初始位置
+            targetButton.style.display = 'block';
+            moveTargetButton();
+
+            // 3. 禁用開始按鈕
+            startButton.disabled = true;
+            startButton.textContent = '遊戲進行中...';
+
+            // 4. 設定遊戲結束計時器
+            gameTimer = setTimeout(endGame, GAME_DURATION);
+        }
+
+        // --- 事件監聽 ---
+
+        // 點擊目標按鈕時觸發
+        targetButton.addEventListener('click', handleButtonClick);
+
+        // 點擊開始按鈕時觸發
+        startButton.addEventListener('click', startGame);
+
+    </script>
+
+</body>
+</html>
