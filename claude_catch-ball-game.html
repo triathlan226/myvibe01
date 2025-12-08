@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>接球小遊戲</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+        }
+        
+        #gameContainer {
+            text-align: center;
+        }
+        
+        #gameCanvas {
+            background: #fff;
+            border: 4px solid #333;
+            border-radius: 8px;
+            display: block;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        #score {
+            color: white;
+            font-size: 24px;
+            margin-top: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        #gameOver {
+            display: none;
+            color: white;
+            font-size: 32px;
+            margin-top: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        #restart {
+            display: none;
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 18px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+        
+        #restart:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+        <div id="score">分數: 0</div>
+        <div id="gameOver">遊戲結束！</div>
+        <button id="restart">重新開始</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const gameOverDisplay = document.getElementById('gameOver');
+        const restartBtn = document.getElementById('restart');
+        
+        let score = 0;
+        let gameRunning = true;
+        
+        // 擋板
+        const paddle = {
+            x: canvas.width / 2 - 40,
+            y: canvas.height - 30,
+            width: 80,
+            height: 15,
+            speed: 8
+        };
+        
+        // 球
+        const ball = {
+            x: Math.random() * (canvas.width - 20),
+            y: 0,
+            radius: 10,
+            speed: 2
+        };
+        
+        // 鍵盤控制
+        const keys = {};
+        
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // 滑鼠控制
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            paddle.x = e.clientX - rect.left - paddle.width / 2;
+            
+            if (paddle.x < 0) paddle.x = 0;
+            if (paddle.x + paddle.width > canvas.width) {
+                paddle.x = canvas.width - paddle.width;
+            }
+        });
+        
+        function drawPaddle() {
+            ctx.fillStyle = '#2196F3';
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            ctx.strokeStyle = '#1976D2';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(paddle.x, paddle.y, paddle.width, paddle.height);
+        }
+        
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#FF5722';
+            ctx.fill();
+            ctx.strokeStyle = '#D84315';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.closePath();
+        }
+        
+        function updatePaddle() {
+            if (keys['ArrowLeft'] && paddle.x > 0) {
+                paddle.x -= paddle.speed;
+            }
+            if (keys['ArrowRight'] && paddle.x < canvas.width - paddle.width) {
+                paddle.x += paddle.speed;
+            }
+        }
+        
+        function updateBall() {
+            ball.y += ball.speed;
+            
+            // 檢查是否接到球
+            if (ball.y + ball.radius >= paddle.y &&
+                ball.x >= paddle.x &&
+                ball.x <= paddle.x + paddle.width) {
+                score++;
+                scoreDisplay.textContent = '分數: ' + score;
+                resetBall();
+                
+                // 加快速度
+                if (score % 5 === 0) {
+                    ball.speed += 0.3;
+                }
+            }
+            
+            // 球掉出畫面
+            if (ball.y - ball.radius > canvas.height) {
+                gameRunning = false;
+                gameOverDisplay.style.display = 'block';
+                restartBtn.style.display = 'inline-block';
+            }
+        }
+        
+        function resetBall() {
+            ball.x = Math.random() * (canvas.width - 20) + 10;
+            ball.y = 0;
+        }
+        
+        function gameLoop() {
+            if (!gameRunning) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            updatePaddle();
+            updateBall();
+            
+            drawPaddle();
+            drawBall();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        restartBtn.addEventListener('click', () => {
+            score = 0;
+            ball.speed = 2;
+            gameRunning = true;
+            scoreDisplay.textContent = '分數: 0';
+            gameOverDisplay.style.display = 'none';
+            restartBtn.style.display = 'none';
+            resetBall();
+            gameLoop();
+        });
+        
+        gameLoop();
+    </script>
+</body>
+</html>
