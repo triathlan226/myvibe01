@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>簡單波動互動教學 - 調整頻率</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.3/lib/p5.min.js"></script>
+  <style>
+    body {
+      font-family: "Microsoft JhengHei", sans-serif;
+      background: #f4f6f8;
+      text-align: center;
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    .panel {
+      background: #ffffff;
+      width: 420px;
+      margin: auto;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    canvas {
+      border: 1px solid #ccc;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🌊 波動頻率互動教學</h1>
+
+<div class="panel">
+  <p>拖曳滑桿，觀察「頻率」改變時，波形的變化。</p>
+  <label>頻率 (Frequency)</label><br>
+  <input type="range" id="freqSlider" min="1" max="10" value="3" step="0.1">
+  <p id="freqText">目前頻率：3 Hz</p>
+</div>
+
+<script>
+let freqSlider;
+let freq = 3;
+let t = 0;
+
+function setup() {
+  let c = createCanvas(400, 200);
+  c.parent(document.body);
+  freqSlider = document.getElementById("freqSlider");
+}
+
+function draw() {
+  background(240);
+  freq = freqSlider.value;
+  document.getElementById("freqText").innerText = "目前頻率：" + freq + " Hz";
+
+  stroke(30, 144, 255);
+  strokeWeight(2);
+  noFill();
+  beginShape();
+  for (let x = 0; x < width; x++) {
+    let y = height/2 + sin(TWO_PI * freq * (x/width) + t) * 50;
+    vertex(x, y);
+  }
+  endShape();
+
+  t += 0.05;
+}
+</script>
+
+</body>
+</html>

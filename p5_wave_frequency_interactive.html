@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>簡單波動互動教學（p5.js）- 調頻率</title>
+  <style>
+    :root { --bg: #f7f7f8; --panel: rgba(255,255,255,.92); --border: rgba(0,0,0,.08); }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      background: var(--bg);
+      color: #111;
+      overflow: hidden;
+    }
+    #ui {
+      position: fixed;
+      left: 14px; top: 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08);
+      backdrop-filter: blur(8px);
+      max-width: min(360px, calc(100vw - 28px));
+    }
+    #title { font-weight: 800; font-size: 16px; margin-bottom: 6px; }
+    .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+    .label { width: 84px; font-size: 13px; opacity: .85; }
+    input[type="range"] { width: 220px; }
+    #readout { font-size: 13px; opacity: .9; line-height: 1.35; margin-top: 8px; }
+    #hint { font-size: 12px; opacity: .7; margin-top: 8px; line-height: 1.35; }
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      border: 1px solid var(--border); background: rgba(0,0,0,.03);
+      font-size: 12px; margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="title">簡單波動互動教學 <span class="pill">p5.js</span></div>
+
+    <div class="row">
+      <div class="label">頻率 f</div>
+      <input id="freq" type="range" min="0.2" max="3.0" step="0.01" value="1.0" />
+      <div id="fval" style="min-width:64px; text-align:right; font-variant-numeric: tabular-nums;">1.00 Hz</div>
+    </div>
+
+    <div class="row">
+      <div class="label">振幅 A</div>
+      <input id="amp" type="range" min="10" max="160" step="1" value="70" />
+      <div id="aval" style="min-width:64px; text-align:right; font-variant-numeric: tabular-nums;">70 px</div>
+    </div>
+
+    <div class="row">
+      <div class="label">波長 λ</div>
+      <input id="lambda" type="range" min="80" max="520" step="1" value="260" />
+      <div id="lval" style="min-width:64px; text-align:right; font-variant-numeric: tabular-nums;">260 px</div>
+    </div>
+
+    <div class="row">
+      <div class="label">速度 v</div>
+      <input id="speed" type="range" min="40" max="520" step="1" value="220" />
+      <div id="vval" style="min-width:64px; text-align:right; font-variant-numeric: tabular-nums;">220 px/s</div>
+    </div>
+
+    <div id="readout"></div>
+    <div id="hint">
+      小提示：把 <b>f</b> 拉高，你會看到波「震動更快」；把 <b>λ</b> 拉大，波峰間距會變寬。<br/>
+      這裡用的是：<b>y(x,t)=A·sin(2π(x/λ − f·t))</b>
+    </div>
+  </div>
+
+  <!-- p5.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+  <script>
+    // UI elements
+    const elF = document.getElementById("freq");
+    const elA = document.getElementById("amp");
+    const elL = document.getElementById("lambda");
+    const elV = document.getElementById("speed");
+
+    const fval = document.getElementById("fval");
+    const aval = document.getElementById("aval");
+    const lval = document.getElementById("lval");
+    const vval = document.getElementById("vval");
+    const readout = document.getElementById("readout");
+
+    function fmt(n, d=2) { return Number(n).toFixed(d); }
+
+    function updateLabels() {
+      const f = parseFloat(elF.value);
+      const A = parseFloat(elA.value);
+      const L = parseFloat(elL.value);
+      const v = parseFloat(elV.value);
+
+      fval.textContent = `${fmt(f,2)} Hz`;
+      aval.textContent = `${Math.round(A)} px`;
+      lval.textContent = `${Math.round(L)} px`;
+      vval.textContent = `${Math.round(v)} px/s`;
+
+      // 以 v = λ·f 做對照（這裡同時提供“自由調速”與“公式對照”）
+      const v_formula = L * f; // px/s
+      readout.innerHTML =
+        `公式對照：<b>v = λ·f</b> → 依目前 λ 與 f 推算 v ≈ <b>${Math.round(v_formula)} px/s</b><br/>` +
+        `你目前設定：f=${fmt(f,2)} Hz，A=${Math.round(A)}，λ=${Math.round(L)}，v=${Math.round(v)} px/s`;
+    }
+
+    ["input", "change"].forEach(evt => {
+      elF.addEventListener(evt, updateLabels);
+      elA.addEventListener(evt, updateLabels);
+      elL.addEventListener(evt, updateLabels);
+      elV.addEventListener(evt, updateLabels);
+    });
+    updateLabels();
+
+    // p5 sketch
+    let t0;
+
+    function setup() {
+      createCanvas(window.innerWidth, window.innerHeight);
+      t0 = millis() / 1000;
+    }
+
+    function windowResized() {
+      resizeCanvas(window.innerWidth, window.innerHeight);
+    }
+
+    function draw() {
+      background(247);
+
+      const f = parseFloat(elF.value);      // Hz
+      const A = parseFloat(elA.value);      // px
+      const L = parseFloat(elL.value);      // px
+      const v = parseFloat(elV.value);      // px/s  (用來控制波“往右跑”的速度)
+
+      const t = (millis() / 1000) - t0;     // seconds
+
+      const midY = height * 0.62;
+
+      // x 軸
+      stroke(0, 60);
+      strokeWeight(1);
+      line(0, midY, width, midY);
+
+      // 刻度
+      for (let x = 0; x <= width; x += 80) {
+        stroke(0, 35);
+        line(x, midY - 6, x, midY + 6);
+      }
+
+      // 波形：行進波 + 頻率相位
+      const omega = TWO_PI * f;             // 角速度
+      const k = TWO_PI / L;                 // 波數
+
+      noFill();
+      stroke(0);
+      strokeWeight(3);
+
+      beginShape();
+      for (let x = 0; x <= width; x += 4) {
+        const phase = k * (x - v * t) - omega * t;
+        const y = midY + A * Math.sin(phase);
+        vertex(x, y);
+      }
+      endShape();
+
+      // 游標點：顯示某個位置的上下震動
+      const px = constrain(mouseX, 0, width);
+      const phaseP = k * (px - v * t) - omega * t;
+      const py = midY + A * Math.sin(phaseP);
+
+      strokeWeight(1);
+      stroke(0, 90);
+      line(px, midY, px, py);
+      noStroke();
+      circle(px, py, 10);
+
+      // 畫布提示
+      noStroke();
+      fill(0, 140);
+      textSize(14);
+      textAlign(LEFT, TOP);
+      text("拖曳滑桿調整：頻率 f、振幅 A、波長 λ、速度 v（行進波）", 14, height - 30);
+    }
+  </script>
+</body>
+</html>
