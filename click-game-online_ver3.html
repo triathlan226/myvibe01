@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>極速點擊王 Online - Ver 3.0</title>
-  <!-- 引入 Google Fonts -->
+  <title>極速點擊王 Online - Ver 3.1 (Fixed)</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Bungee&display=swap" rel="stylesheet">
-  <!-- 引入 Firebase -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <style>
@@ -61,7 +59,15 @@
     .nickname-section {
       margin-bottom: 1.5rem;
       display: flex;
+      flex-direction: column;
       gap: 10px;
+      align-items: center;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+      width: 100%;
       justify-content: center;
     }
 
@@ -71,6 +77,7 @@
       border-radius: 8px;
       outline: none;
       transition: border-color 0.3s;
+      width: 60%;
     }
 
     input:focus {
@@ -93,6 +100,8 @@
     .game-area {
       margin: 2rem 0;
       position: relative;
+      display: flex;
+      justify-content: center;
     }
 
     #clickBtn {
@@ -107,6 +116,9 @@
       cursor: pointer;
       user-select: none;
       transition: transform 0.1s;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     #clickBtn:active {
@@ -165,40 +177,37 @@
 
     .combo-text {
       position: absolute;
-      top: -30px;
-      left: 50%;
-      transform: translateX(-50%);
+      top: -40px;
       font-family: 'Bungee', cursive;
       color: var(--accent-color);
-      font-size: 1.2rem;
+      font-size: 1.5rem;
       opacity: 0;
-      transition: opacity 0.2s;
+      pointer-events: none;
+      transition: transform 0.2s, opacity 0.2s;
     }
 
-    .show-combo { opacity: 1; animation: bounce 0.3s; }
-
-    @keyframes bounce {
-      0%, 100% { transform: translateX(-50%) scale(1); }
-      50% { transform: translateX(-50%) scale(1.3); }
-    }
+    .show-combo { opacity: 1; transform: scale(1.2); }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>CLICK KING</h1>
     <div class="status-bar">
-      <span>在線人數: <span id="onlineCount">0</span></span>
-      <span id="nicknameHint">請先設定暱稱</span>
+      <span>在線: <span id="onlineCount">0</span></span>
+      <span id="nicknameHint" style="color: #636e72;">請設定暱稱</span>
     </div>
 
     <div class="nickname-section">
-      <input type="text" id="nicknameInput" placeholder="輸入你的大名..." maxlength="10">
-      <button id="saveNicknameBtn" class="btn-primary">確認</button>
+      <div class="input-group">
+        <input type="text" id="nicknameInput" placeholder="輸入暱稱..." maxlength="10">
+        <button id="saveNicknameBtn" class="btn-primary">設定</button>
+      </div>
+      <button id="editNicknameBtn" style="display:none; font-size: 0.8rem; background: none; color: var(--primary-color); text-decoration: underline;">修改暱稱</button>
     </div>
 
     <div class="stats">
-      <div>剩餘時間: <span class="timer" id="timeDisplay">10</span>s</div>
-      <div>目前得分: <span class="score" id="scoreDisplay">0</span></div>
+      <div>時間: <span class="timer" id="timeDisplay">10</span>s</div>
+      <div>得分: <span class="score" id="scoreDisplay">0</span></div>
     </div>
 
     <div class="game-area">
@@ -206,7 +215,7 @@
       <button id="clickBtn" disabled>點我！</button>
     </div>
 
-    <div id="result" style="font-weight: bold; color: var(--accent-color); margin: 10px 0;"></div>
+    <div id="result" style="font-weight: bold; color: var(--accent-color); margin: 10px 0; min-height: 1.2em;"></div>
 
     <div style="display: flex; gap: 10px; justify-content: center;">
       <button id="startBtn" class="btn-primary" disabled>開始遊戲</button>
@@ -218,23 +227,31 @@
       <ul id="leaderboard">
         <li>載入中...</li>
       </ul>
-      <p id="bestScoreText" style="font-size: 0.9rem; color: #636e72; margin-top: 10px;"></p>
+      <p id="bestScoreText" style="font-size: 0.85rem; color: #636e72; margin-top: 10px;"></p>
     </div>
   </div>
 
   <script>
-    // Firebase 配置 (請替換為您自己的配置)
+    // 使用 Ver 2 的正確 Firebase 配置
     const firebaseConfig = {
-      databaseURL: "https://myvibe01-default-rtdb.firebaseio.com/"
+      apiKey: "AIzaSyCcTZY_Fike_D_Dnav9SnaLpwLziEQeu8s",
+      authDomain: "click-game-ad813.firebaseapp.com",
+      projectId: "click-game-ad813",
+      storageBucket: "click-game-ad813.firebasestorage.app",
+      messagingSenderId: "738808291812",
+      appId: "1:738808291812:web:c60d1125397d1c7be3e7f1",
+      measurementId: "G-JK5M4VCQDT",
+      databaseURL: "https://click-game-ad813-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    const userId = "user_" + Math.random().toString(36).slice(2);
+    let currentNickname = "";
     let score = 0;
     let timeLeft = 10;
     let timerId = null;
     let isGameStarted = false;
-    let currentNickname = "";
     let combo = 0;
     let lastClickTime = 0;
 
@@ -246,51 +263,83 @@
     const resultDiv = document.getElementById("result");
     const nicknameInput = document.getElementById("nicknameInput");
     const saveNicknameBtn = document.getElementById("saveNicknameBtn");
+    const editNicknameBtn = document.getElementById("editNicknameBtn");
     const nicknameHint = document.getElementById("nicknameHint");
     const onlineCountEl = document.getElementById("onlineCount");
     const leaderboardEl = document.getElementById("leaderboard");
     const bestScoreText = document.getElementById("bestScoreText");
     const comboText = document.getElementById("comboText");
 
-    // 暱稱設定
+    const onlineRef = db.ref("onlineUsers/" + userId);
+
+    // 暱稱邏輯
     saveNicknameBtn.addEventListener("click", () => {
       const name = nicknameInput.value.trim();
       if (!name) return alert("請輸入暱稱！");
       currentNickname = name;
-      nicknameHint.textContent = `玩家：${currentNickname}`;
-      nicknameHint.style.color = "#6c5ce7";
+      updateNicknameUI(true);
       
-      const onlineRef = db.ref("onlineUsers").push();
-      onlineRef.set({ name: currentNickname, lastActive: firebase.database.ServerValue.TIMESTAMP });
+      onlineRef.set({ 
+        name: currentNickname, 
+        lastActive: firebase.database.ServerValue.TIMESTAMP 
+      });
       onlineRef.onDisconnect().remove();
-      
       startBtn.disabled = false;
-      nicknameInput.disabled = true;
-      saveNicknameBtn.disabled = true;
     });
 
-    // 點擊邏輯
+    editNicknameBtn.addEventListener("click", () => {
+      updateNicknameUI(false);
+    });
+
+    function updateNicknameUI(isSet) {
+      if (isSet) {
+        nicknameHint.textContent = `玩家：${currentNickname}`;
+        nicknameHint.style.color = "#6c5ce7";
+        nicknameInput.style.display = "none";
+        saveNicknameBtn.style.display = "none";
+        editNicknameBtn.style.display = "inline-block";
+      } else {
+        nicknameHint.textContent = "請設定暱稱";
+        nicknameHint.style.color = "#636e72";
+        nicknameInput.style.display = "inline-block";
+        saveNicknameBtn.style.display = "inline-block";
+        editNicknameBtn.style.display = "none";
+        startBtn.disabled = true;
+      }
+    }
+
+    // 點擊與 Combo 邏輯 (基於頻率)
     clickBtn.addEventListener("click", () => {
       if (!isGameStarted) return;
       
       const now = Date.now();
-      if (now - lastClickTime < 300) {
+      // 如果兩次點擊間隔小於 250ms，則增加 Combo
+      if (now - lastClickTime < 250) {
         combo++;
-        if (combo > 2) {
-          comboText.textContent = `COMBO X${combo}`;
-          comboText.classList.add("show-combo");
-        }
       } else {
         combo = 1;
-        comboText.classList.remove("show-combo");
       }
       lastClickTime = now;
 
-      score += combo; // 連擊加分
+      // 顯示 Combo
+      if (combo >= 2) {
+        comboText.textContent = `COMBO X${combo}`;
+        comboText.classList.add("show-combo");
+        // 1秒後如果沒繼續點擊，Combo 消失
+        clearTimeout(window.comboTimeout);
+        window.comboTimeout = setTimeout(() => {
+          comboText.classList.remove("show-combo");
+          combo = 1;
+        }, 500);
+      }
+
+      // 分數計算：基礎 1 分 + Combo 獎勵 (每 5 Combo 多 1 分)
+      const bonus = Math.floor(combo / 5);
+      score += (1 + bonus);
       scoreDisplay.textContent = score;
       
       // 視覺反饋
-      clickBtn.style.transform = "scale(0.95)";
+      clickBtn.style.transform = "scale(0.92)";
       setTimeout(() => clickBtn.style.transform = "scale(1)", 50);
     });
 
@@ -305,12 +354,13 @@
       isGameStarted = true;
       score = 0;
       timeLeft = 10;
-      combo = 0;
+      combo = 1;
       scoreDisplay.textContent = score;
       timeDisplay.textContent = timeLeft;
       clickBtn.disabled = false;
       startBtn.disabled = true;
-      resultDiv.textContent = "GO! GO! GO!";
+      editNicknameBtn.style.visibility = "hidden";
+      resultDiv.textContent = "GO!";
 
       timerId = setInterval(() => {
         timeLeft--;
@@ -324,8 +374,9 @@
       isGameStarted = false;
       clickBtn.disabled = true;
       startBtn.disabled = false;
+      editNicknameBtn.style.visibility = "visible";
       comboText.classList.remove("show-combo");
-      resultDiv.textContent = `遊戲結束！最終得分：${score}`;
+      resultDiv.textContent = `時間到！得分：${score}`;
 
       if (currentNickname && score > 0) {
         db.ref("scores").push({
@@ -345,16 +396,17 @@
       scoreDisplay.textContent = score;
       clickBtn.disabled = true;
       startBtn.disabled = !currentNickname;
+      editNicknameBtn.style.visibility = "visible";
       resultDiv.textContent = "";
       comboText.classList.remove("show-combo");
     }
 
-    // 監聽在線人數
+    // 數據監聽
     db.ref("onlineUsers").on("value", (snap) => {
-      onlineCountEl.textContent = Object.keys(snap.val() || {}).length;
+      const data = snap.val() || {};
+      onlineCountEl.textContent = Object.keys(data).length;
     });
 
-    // 排行榜更新
     db.ref("scores").orderByChild("score").limitToLast(5).on("value", (snap) => {
       const list = [];
       snap.forEach(child => list.push(child.val()));
@@ -363,14 +415,21 @@
       leaderboardEl.innerHTML = list.map((item, i) => `
         <li>
           <span><span class="rank">${i+1}</span>${escapeHtml(item.name)}</span>
-          <span style="color:var(--primary-color); font-weight:bold;">${item.score} pts</span>
+          <span style="color:var(--primary-color); font-weight:bold;">${item.score} 次</span>
         </li>
       `).join("") || "<li>尚無數據</li>";
 
       if (list.length > 0) {
-        bestScoreText.innerHTML = `🔥 全球最高紀錄：${list[0].score} (由 ${escapeHtml(list[0].name)} 保持)`;
+        bestScoreText.innerHTML = `🔥 最高紀錄：${list[0].score} 次 (${escapeHtml(list[0].name)})`;
       }
     });
+
+    // 定期更新在線狀態
+    setInterval(() => {
+      if (currentNickname) {
+        onlineRef.update({ lastActive: firebase.database.ServerValue.TIMESTAMP });
+      }
+    }, 10000);
 
     function escapeHtml(str) {
       const div = document.createElement('div');
