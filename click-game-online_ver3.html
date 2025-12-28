@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>極速點擊王 Online - Ver 3.2 (Optimized)</title>
+  <title>極速點擊王 Online - Ver 3.3</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Bungee&display=swap" rel="stylesheet">
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -327,8 +327,8 @@
         }, 500);
       }
 
-      const bonus = Math.floor(combo / 5);
-      score += (1 + bonus);
+      // 簡化規則：點一下得一分
+      score += 1;
       scoreDisplay.textContent = score;
       
       clickBtn.style.transform = "scale(0.92)";
@@ -371,7 +371,6 @@
       resultDiv.textContent = `上傳成績中...`;
 
       if (currentNickname && score > 0) {
-        // 使用 push().set() 並監聽完成回調
         const newScoreRef = db.ref("scores").push();
         newScoreRef.set({
           name: currentNickname,
@@ -382,7 +381,6 @@
             resultDiv.textContent = `上傳失敗：${error.message}`;
           } else {
             resultDiv.textContent = `時間到！最終得分：${score}`;
-            // 強制刷新排行榜顯示
             refreshLeaderboard();
           }
         });
@@ -405,20 +403,17 @@
       comboText.classList.remove("show-combo");
     }
 
-    // 數據監聽
     db.ref("onlineUsers").on("value", (snap) => {
       const data = snap.val() || {};
       onlineCountEl.textContent = Object.keys(data).length;
     });
 
-    // 將排行榜邏輯封裝，以便手動觸發
     function refreshLeaderboard() {
       db.ref("scores").orderByChild("score").limitToLast(10).once("value", (snap) => {
         updateLeaderboardUI(snap);
       });
     }
 
-    // 持續監聽排行榜
     db.ref("scores").orderByChild("score").limitToLast(10).on("value", (snap) => {
       updateLeaderboardUI(snap);
     });
@@ -428,7 +423,6 @@
       snap.forEach(child => {
         list.push(child.val());
       });
-      // Firebase limitToLast 返回的是升序，我們需要降序
       list.sort((a, b) => b.score - a.score);
       
       leaderboardEl.innerHTML = list.map((item, i) => `
