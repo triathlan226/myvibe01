@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>極速點擊王 Online - Ver 3.0</title>
+  <!-- 引入 Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Bungee&display=swap" rel="stylesheet">
+  <!-- 引入 Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <style>
+    :root {
+      --primary-color: #6c5ce7;
+      --secondary-color: #a29bfe;
+      --accent-color: #fd79a8;
+      --bg-color: #f0f2f5;
+      --card-bg: #ffffff;
+      --text-color: #2d3436;
+    }
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      background: var(--card-bg);
+      padding: 2rem;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Bungee', cursive;
+      color: var(--primary-color);
+      margin-bottom: 0.5rem;
+      font-size: 2.5rem;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 1.5rem;
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+
+    .nickname-section {
+      margin-bottom: 1.5rem;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    input {
+      padding: 10px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    input:focus {
+      border-color: var(--primary-color);
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+
+    .btn-primary { background: var(--primary-color); color: white; }
+    .btn-primary:hover { background: #5b4bc4; transform: translateY(-2px); }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+    .game-area {
+      margin: 2rem 0;
+      position: relative;
+    }
+
+    #clickBtn {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--accent-color), #e84393);
+      color: white;
+      font-size: 1.5rem;
+      border: 8px solid rgba(255,255,255,0.3);
+      box-shadow: 0 8px 20px rgba(253, 121, 168, 0.4);
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.1s;
+    }
+
+    #clickBtn:active {
+      transform: scale(0.9);
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+    }
+
+    .timer { color: #d63031; font-weight: bold; }
+    .score { color: var(--primary-color); font-weight: bold; }
+
+    .leaderboard-card {
+      margin-top: 2rem;
+      text-align: left;
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 12px;
+    }
+
+    .leaderboard-card h3 {
+      margin-top: 0;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 5px;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    li {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .rank {
+      width: 25px;
+      height: 25px;
+      background: var(--secondary-color);
+      color: white;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 50%;
+      font-size: 0.8rem;
+      margin-right: 10px;
+    }
+
+    .combo-text {
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Bungee', cursive;
+      color: var(--accent-color);
+      font-size: 1.2rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .show-combo { opacity: 1; animation: bounce 0.3s; }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.3); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>CLICK KING</h1>
+    <div class="status-bar">
+      <span>在線人數: <span id="onlineCount">0</span></span>
+      <span id="nicknameHint">請先設定暱稱</span>
+    </div>
+
+    <div class="nickname-section">
+      <input type="text" id="nicknameInput" placeholder="輸入你的大名..." maxlength="10">
+      <button id="saveNicknameBtn" class="btn-primary">確認</button>
+    </div>
+
+    <div class="stats">
+      <div>剩餘時間: <span class="timer" id="timeDisplay">10</span>s</div>
+      <div>目前得分: <span class="score" id="scoreDisplay">0</span></div>
+    </div>
+
+    <div class="game-area">
+      <div id="comboText" class="combo-text">COMBO X1</div>
+      <button id="clickBtn" disabled>點我！</button>
+    </div>
+
+    <div id="result" style="font-weight: bold; color: var(--accent-color); margin: 10px 0;"></div>
+
+    <div style="display: flex; gap: 10px; justify-content: center;">
+      <button id="startBtn" class="btn-primary" disabled>開始遊戲</button>
+      <button id="resetBtn" style="background: #636e72; color: white;">重置</button>
+    </div>
+
+    <div class="leaderboard-card">
+      <h3>🏆 世界排行榜 (Top 5)</h3>
+      <ul id="leaderboard">
+        <li>載入中...</li>
+      </ul>
+      <p id="bestScoreText" style="font-size: 0.9rem; color: #636e72; margin-top: 10px;"></p>
+    </div>
+  </div>
+
+  <script>
+    // Firebase 配置 (請替換為您自己的配置)
+    const firebaseConfig = {
+      databaseURL: "https://myvibe01-default-rtdb.firebaseio.com/"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let score = 0;
+    let timeLeft = 10;
+    let timerId = null;
+    let isGameStarted = false;
+    let currentNickname = "";
+    let combo = 0;
+    let lastClickTime = 0;
+
+    const clickBtn = document.getElementById("clickBtn");
+    const scoreDisplay = document.getElementById("scoreDisplay");
+    const timeDisplay = document.getElementById("timeDisplay");
+    const startBtn = document.getElementById("startBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const resultDiv = document.getElementById("result");
+    const nicknameInput = document.getElementById("nicknameInput");
+    const saveNicknameBtn = document.getElementById("saveNicknameBtn");
+    const nicknameHint = document.getElementById("nicknameHint");
+    const onlineCountEl = document.getElementById("onlineCount");
+    const leaderboardEl = document.getElementById("leaderboard");
+    const bestScoreText = document.getElementById("bestScoreText");
+    const comboText = document.getElementById("comboText");
+
+    // 暱稱設定
+    saveNicknameBtn.addEventListener("click", () => {
+      const name = nicknameInput.value.trim();
+      if (!name) return alert("請輸入暱稱！");
+      currentNickname = name;
+      nicknameHint.textContent = `玩家：${currentNickname}`;
+      nicknameHint.style.color = "#6c5ce7";
+      
+      const onlineRef = db.ref("onlineUsers").push();
+      onlineRef.set({ name: currentNickname, lastActive: firebase.database.ServerValue.TIMESTAMP });
+      onlineRef.onDisconnect().remove();
+      
+      startBtn.disabled = false;
+      nicknameInput.disabled = true;
+      saveNicknameBtn.disabled = true;
+    });
+
+    // 點擊邏輯
+    clickBtn.addEventListener("click", () => {
+      if (!isGameStarted) return;
+      
+      const now = Date.now();
+      if (now - lastClickTime < 300) {
+        combo++;
+        if (combo > 2) {
+          comboText.textContent = `COMBO X${combo}`;
+          comboText.classList.add("show-combo");
+        }
+      } else {
+        combo = 1;
+        comboText.classList.remove("show-combo");
+      }
+      lastClickTime = now;
+
+      score += combo; // 連擊加分
+      scoreDisplay.textContent = score;
+      
+      // 視覺反饋
+      clickBtn.style.transform = "scale(0.95)";
+      setTimeout(() => clickBtn.style.transform = "scale(1)", 50);
+    });
+
+    startBtn.addEventListener("click", () => {
+      if (isGameStarted) return;
+      startGame();
+    });
+
+    resetBtn.addEventListener("click", resetGame);
+
+    function startGame() {
+      isGameStarted = true;
+      score = 0;
+      timeLeft = 10;
+      combo = 0;
+      scoreDisplay.textContent = score;
+      timeDisplay.textContent = timeLeft;
+      clickBtn.disabled = false;
+      startBtn.disabled = true;
+      resultDiv.textContent = "GO! GO! GO!";
+
+      timerId = setInterval(() => {
+        timeLeft--;
+        timeDisplay.textContent = timeLeft;
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+    }
+
+    function endGame() {
+      clearInterval(timerId);
+      isGameStarted = false;
+      clickBtn.disabled = true;
+      startBtn.disabled = false;
+      comboText.classList.remove("show-combo");
+      resultDiv.textContent = `遊戲結束！最終得分：${score}`;
+
+      if (currentNickname && score > 0) {
+        db.ref("scores").push({
+          name: currentNickname,
+          score: score,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+      }
+    }
+
+    function resetGame() {
+      clearInterval(timerId);
+      isGameStarted = false;
+      score = 0;
+      timeLeft = 10;
+      timeDisplay.textContent = timeLeft;
+      scoreDisplay.textContent = score;
+      clickBtn.disabled = true;
+      startBtn.disabled = !currentNickname;
+      resultDiv.textContent = "";
+      comboText.classList.remove("show-combo");
+    }
+
+    // 監聽在線人數
+    db.ref("onlineUsers").on("value", (snap) => {
+      onlineCountEl.textContent = Object.keys(snap.val() || {}).length;
+    });
+
+    // 排行榜更新
+    db.ref("scores").orderByChild("score").limitToLast(5).on("value", (snap) => {
+      const list = [];
+      snap.forEach(child => list.push(child.val()));
+      list.sort((a, b) => b.score - a.score);
+      
+      leaderboardEl.innerHTML = list.map((item, i) => `
+        <li>
+          <span><span class="rank">${i+1}</span>${escapeHtml(item.name)}</span>
+          <span style="color:var(--primary-color); font-weight:bold;">${item.score} pts</span>
+        </li>
+      `).join("") || "<li>尚無數據</li>";
+
+      if (list.length > 0) {
+        bestScoreText.innerHTML = `🔥 全球最高紀錄：${list[0].score} (由 ${escapeHtml(list[0].name)} 保持)`;
+      }
+    });
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
