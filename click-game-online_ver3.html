@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>極速點擊王 Online - Ver 3.1 (Fixed)</title>
+  <title>極速點擊王 Online - Ver 3.2 (Optimized)</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Bungee&display=swap" rel="stylesheet">
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -223,7 +223,7 @@
     </div>
 
     <div class="leaderboard-card">
-      <h3>🏆 世界排行榜 (Top 5)</h3>
+      <h3>🏆 世界排行榜 (Top 10)</h3>
       <ul id="leaderboard">
         <li>載入中...</li>
       </ul>
@@ -232,7 +232,6 @@
   </div>
 
   <script>
-    // 使用 Ver 2 的正確 Firebase 配置
     const firebaseConfig = {
       apiKey: "AIzaSyCcTZY_Fike_D_Dnav9SnaLpwLziEQeu8s",
       authDomain: "click-game-ad813.firebaseapp.com",
@@ -252,7 +251,7 @@
     let timeLeft = 10;
     let timerId = null;
     let isGameStarted = false;
-    let combo = 0;
+    let combo = 1;
     let lastClickTime = 0;
 
     const clickBtn = document.getElementById("clickBtn");
@@ -272,7 +271,6 @@
 
     const onlineRef = db.ref("onlineUsers/" + userId);
 
-    // 暱稱邏輯
     saveNicknameBtn.addEventListener("click", () => {
       const name = nicknameInput.value.trim();
       if (!name) return alert("請輸入暱稱！");
@@ -308,12 +306,10 @@
       }
     }
 
-    // 點擊與 Combo 邏輯 (基於頻率)
     clickBtn.addEventListener("click", () => {
       if (!isGameStarted) return;
       
       const now = Date.now();
-      // 如果兩次點擊間隔小於 250ms，則增加 Combo
       if (now - lastClickTime < 250) {
         combo++;
       } else {
@@ -321,11 +317,9 @@
       }
       lastClickTime = now;
 
-      // 顯示 Combo
       if (combo >= 2) {
         comboText.textContent = `COMBO X${combo}`;
         comboText.classList.add("show-combo");
-        // 1秒後如果沒繼續點擊，Combo 消失
         clearTimeout(window.comboTimeout);
         window.comboTimeout = setTimeout(() => {
           comboText.classList.remove("show-combo");
@@ -333,12 +327,10 @@
         }, 500);
       }
 
-      // 分數計算：基礎 1 分 + Combo 獎勵 (每 5 Combo 多 1 分)
       const bonus = Math.floor(combo / 5);
       score += (1 + bonus);
       scoreDisplay.textContent = score;
       
-      // 視覺反饋
       clickBtn.style.transform = "scale(0.92)";
       setTimeout(() => clickBtn.style.transform = "scale(1)", 50);
     });
@@ -376,14 +368,26 @@
       startBtn.disabled = false;
       editNicknameBtn.style.visibility = "visible";
       comboText.classList.remove("show-combo");
-      resultDiv.textContent = `時間到！得分：${score}`;
+      resultDiv.textContent = `上傳成績中...`;
 
       if (currentNickname && score > 0) {
-        db.ref("scores").push({
+        // 使用 push().set() 並監聽完成回調
+        const newScoreRef = db.ref("scores").push();
+        newScoreRef.set({
           name: currentNickname,
           score: score,
           timestamp: firebase.database.ServerValue.TIMESTAMP
+        }, (error) => {
+          if (error) {
+            resultDiv.textContent = `上傳失敗：${error.message}`;
+          } else {
+            resultDiv.textContent = `時間到！最終得分：${score}`;
+            // 強制刷新排行榜顯示
+            refreshLeaderboard();
+          }
         });
+      } else {
+        resultDiv.textContent = `時間到！得分：${score}`;
       }
     }
 
@@ -407,9 +411,24 @@
       onlineCountEl.textContent = Object.keys(data).length;
     });
 
-    db.ref("scores").orderByChild("score").limitToLast(5).on("value", (snap) => {
+    // 將排行榜邏輯封裝，以便手動觸發
+    function refreshLeaderboard() {
+      db.ref("scores").orderByChild("score").limitToLast(10).once("value", (snap) => {
+        updateLeaderboardUI(snap);
+      });
+    }
+
+    // 持續監聽排行榜
+    db.ref("scores").orderByChild("score").limitToLast(10).on("value", (snap) => {
+      updateLeaderboardUI(snap);
+    });
+
+    function updateLeaderboardUI(snap) {
       const list = [];
-      snap.forEach(child => list.push(child.val()));
+      snap.forEach(child => {
+        list.push(child.val());
+      });
+      // Firebase limitToLast 返回的是升序，我們需要降序
       list.sort((a, b) => b.score - a.score);
       
       leaderboardEl.innerHTML = list.map((item, i) => `
@@ -422,9 +441,8 @@
       if (list.length > 0) {
         bestScoreText.innerHTML = `🔥 最高紀錄：${list[0].score} 次 (${escapeHtml(list[0].name)})`;
       }
-    });
+    }
 
-    // 定期更新在線狀態
     setInterval(() => {
       if (currentNickname) {
         onlineRef.update({ lastActive: firebase.database.ServerValue.TIMESTAMP });
