@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>像素偶像人生 Pixel Idol Life</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        :root {
+            --bg-color: #2c3e50;
+            --panel-bg: #34495e;
+            --text-color: #ecf0f1;
+            --accent-color: #e74c3c;
+            --highlight-color: #f1c40f;
+            --bar-bg: #1a252f;
+            --font-main: 'Press Start 2P', cursive;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-size: 10px;
+            image-rendering: pixelated;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 640px;
+            height: 85vh;
+            background-color: #222;
+            border: 4px solid var(--text-color);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Top Bar */
+        #top-bar {
+            background-color: var(--panel-bg);
+            padding: 8px;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--text-color);
+            font-size: 9px;
+        }
+
+        .stat-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Action Menu */
+        #actions-panel {
+            height: 110px;
+            background-color: var(--panel-bg);
+            border-bottom: 2px solid var(--text-color);
+            padding: 8px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-category {
+            flex: 1;
+            border: 1px dashed #7f8c8d;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow-y: auto;
+        }
+
+        .cat-title {
+            text-align: center;
+            margin-bottom: 2px;
+            color: var(--highlight-color);
+            font-size: 9px;
+        }
+
+        button {
+            background-color: #2c3e50;
+            color: white;
+            border: 2px solid #bdc3c7;
+            padding: 5px;
+            font-family: var(--font-main);
+            font-size: 9px;
+            cursor: pointer;
+            transition: all 0.1s;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Special style for PC buttons to be smaller but visible */
+        #cat-pc button {
+            font-size: 8.5px; /* Slightly smaller than 9px */
+            padding: 6px 4px; /* Slightly taller touch area, narrower side padding */
+        }
+
+        button:hover {
+            background-color: #34495e;
+            border-color: var(--highlight-color);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Main Area */
+        #main-area {
+            flex: 1;
+            display: flex;
+            position: relative;
+            min-height: 0;
+        }
+
+        /* Left Panel - Needs */
+        #needs-panel {
+            width: 160px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 8px;
+            border-right: 2px solid var(--text-color);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow-y: auto;
+        }
+
+        .need-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .need-label {
+            font-size: 9px;
+            color: #aaa;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: var(--bar-bg);
+            border: 1px solid #555;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 100%;
+            background-color: #2ecc71;
+            transition: width 0.2s, background-color 0.2s;
+        }
+
+        /* Center Area - Scene */
+        #scene-view {
+            flex: 1;
+            position: relative;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        #scene-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.3;
+            background-size: cover;
+            background-position: center;
+        }
+
+        #character {
+            font-size: 48px;
+            z-index: 10;
+            margin-bottom: 15px;
+            transition: transform 0.2s;
+        }
+
+        .bounce {
+            animation: bounce 0.5s infinite alternate;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-8px); }
+        }
+
+        #scene-title {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: var(--highlight-color);
+            z-index: 20;
+            text-shadow: 2px 2px #000;
+        }
+
+        /* Log Panel */
+        #log-panel {
+            width: 200px;
+            background-color: #000;
+            border-left: 2px solid var(--text-color);
+            padding: 8px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 10px;
+            display: flex;
+            flex-direction: column-reverse; 
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 2px;
+        }
+        
+        .log-time { color: #888; margin-right: 4px; }
+        .log-info { color: #3498db; }
+        .log-warn { color: #e67e22; }
+        .log-danger { color: #e74c3c; font-weight: bold;}
+        .log-success { color: #2ecc71; }
+
+        /* Dialog/Modal */
+        #modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        #modal-box {
+            background: var(--panel-bg);
+            border: 4px solid white;
+            padding: 15px;
+            max-width: 350px;
+            text-align: center;
+        }
+
+        .hidden { display: none !important; }
+
+        /* Specific Status Styling */
+        .status-value { float: right; }
+        
+        #career-badge {
+            background: var(--highlight-color);
+            color: #000;
+            padding: 2px 4px;
+            font-size: 9px;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- Top Bar -->
+    <div id="top-bar">
+        <div class="stat-group">
+            <div><span id="clock-display">DAY 1 - 08:00</span></div>
+            <div id="career-badge">練習生</div>
+        </div>
+        <div class="stat-group">
+            <div>粉絲: <span id="stat-followers" style="color:var(--highlight-color)">0</span></div>
+            <div>魅力: <span id="stat-charisma">10</span></div>
+            <div>體格: <span id="stat-fitness">10</span></div>
+            <div>金: $<span id="stat-money">500</span></div>
+        </div>
+    </div>
+
+    <!-- Actions Panel -->
+    <div id="actions-panel">
+        <!-- Home Actions -->
+        <div class="action-category" id="cat-home">
+            <div class="cat-title">小套房</div>
+            <button onclick="game.action('sleep')">🛏️ 睡覺 (5秒滿體)</button>
+            <button onclick="game.action('eat')">🍱 吃飯 (飢餓)</button>
+            <button onclick="game.action('shower')">🚿 洗澡 (衛生)</button>
+        </div>
+
+        <!-- PC Actions -->
+        <div class="action-category" id="cat-pc">
+            <div class="cat-title">電腦</div>
+            <button onclick="game.action('chat')">💬 網路聊天 (社交)</button>
+            <button onclick="game.action('practice')">💃 練習 (魅力/體格)</button>
+            <button onclick="game.action('stream')">📹 直播 (粉絲/樂/心)</button>
+            <button onclick="game.action('work')">💻 接案 (賺錢)</button>
+        </div>
+
+        <!-- Outside Actions -->
+        <div class="action-category" id="cat-map" style="display:none;">
+            <div class="cat-title">地圖</div>
+            <button onclick="game.changeScene('home')">🏠 回家</button>
+            <button onclick="game.action('meet_npc')">🗣️ 與路人交談</button>
+            <button onclick="game.action('busking')">🎸 街頭表演</button>
+            <button onclick="game.action('audition')" id="btn-audition" style="border-color:gold; color:gold;">🏆 參加選秀</button>
+        </div>
+
+        <!-- Navigation -->
+        <div class="action-category" style="flex: 0.5">
+            <div class="cat-title">移動</div>
+            <button id="btn-go-out" onclick="game.changeScene('outside')">🚪 出門</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-area">
+        <!-- Needs Panel -->
+        <div id="needs-panel">
+            <div class="need-item">
+                <div class="need-label">體力 (Energy) <span class="status-value" id="val-energy">100</span></div>
+                <div class="progress-bar"><div class="progress-fill" id="bar-energy"></div></div>
+            </div>
+            <div class="need-item">
+                <div class="need-label">飢餓 (Hunger) <span class="status-value" id="val-hunger">100</span></div>
+                <div class="progress-bar"><div class="progress-fill" id="bar-hunger"></div></div>
+            </div>
+            <div class="need-item">
+                <div class="need-label">心情 (Mood) <span class="status-value" id="val-mood">100</span></div>
+                <div class="progress-bar"><div class="progress-fill" id="bar-mood"></div></div>
+            </div>
+            <div class="need-item">
+                <div class="need-label">社交 (Social) <span class="status-value" id="val-social">100</span></div>
+                <div class="progress-bar"><div class="progress-fill" id="bar-social"></div></div>
+            </div>
+            <div class="need-item">
+                <div class="need-label">衛生 (Hygiene) <span class="status-value" id="val-hygiene">100</span></div>
+                <div class="progress-bar"><div class="progress-fill" id="bar-hygiene"></div></div>
+            </div>
+            <div class="need-item">
+                <div class="need-label">娛樂 (Fun) <span class="status-value" id="val-fun">100</span></div>
+                <div class="progress-bar"><div class="progress-fill" id="bar-fun"></div></div>
+            </div>
+        </div>
+
+        <!-- Scene View -->
+        <div id="scene-view">
+            <div id="scene-bg"></div>
+            <div id="scene-title">小套房</div>
+            <div id="character">👩</div>
+            <div id="scene-message" style="margin-top:20px; color:#aaa; font-size:10px;"></div>
+        </div>
+
+        <!-- Log Panel -->
+        <div id="log-panel" id="game-log">
+            <!-- Logs go here -->
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal-overlay">
+        <div id="modal-box">
+            <h2 id="modal-title">TITLE</h2>
+            <p id="modal-desc">Description</p>
+            <button onclick="game.closeModal()" style="margin-top:15px; width:100%;">確定</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * Pixel Idol Life - Game Logic
+ */
+
+const CONSTANTS = {
+    // 1 real sec = 1 game min
+    // 1 tick = 1 game min
+    TICK_RATE: 1000, 
+    DECAY: {
+        ENERGY: 0.15,
+        HUNGER: 0.2,
+        MOOD: 0.15,
+        SOCIAL: 0.1,
+        HYGIENE: 0.15,
+        FUN: 0.15
+    },
+    THRESHOLDS: {
+        AUDITION_FANS: 500,    // 成為明星門檻
+        DEBUT_FANS: 500,
+        SUPERSTAR_FANS: 1000   // 成為巨星門檻
+    }
+};
+
+const SCENES = {
+    home: {
+        title: "簡陋小套房",
+        bg: "linear-gradient(45deg, #2c3e50 25%, #34495e 25%, #34495e 50%, #2c3e50 50%, #2c3e50 75%, #34495e 75%, #34495e 100%)",
+        buttons: ['cat-home', 'cat-pc']
+    },
+    outside: {
+        title: "繁華都市街道",
+        bg: "linear-gradient(135deg, #1abc9c 25%, #16a085 25%, #16a085 50%, #1abc9c 50%, #1abc9c 75%, #16a085 75%, #16a085 100%)",
+        buttons: ['cat-map']
+    }
+};
+
+class Game {
+    constructor() {
+        this.state = {
+            day: 1,
+            hour: 8,
+            minute: 0,
+            
+            // Needs (0-100)
+            energy: 90,
+            hunger: 80,
+            mood: 80,
+            social: 70,
+            hygiene: 80,
+            fun: 70,
+
+            // Stats
+            charisma: 10,
+            fitness: 10,
+            followers: 10,
+            money: 500,
+            
+            // Flags
+            isSleeping: false,
+            careerLevel: 'trainee', // trainee, debuted, superstar
+            currentScene: 'home'
+        };
+
+        this.timer = null;
+        this.logContainer = document.getElementById('log-panel');
+        this.init();
+    }
+
+    init() {
+        this.updateUI();
+        this.changeScene('home');
+        this.log("歡迎來到像素偶像人生！", "log-info");
+        this.startGameLoop();
+    }
+
+    startGameLoop() {
+        this.timer = setInterval(() => this.tick(), CONSTANTS.TICK_RATE);
+    }
+
+    stopGameLoop() {
+        clearInterval(this.timer);
+    }
+
+    tick() {
+        if(this.state.isSleeping) {
+            // Sleeping mechanics: 5 seconds to full
+            // tick rate is 1 sec. To fill 100 in 5 secs, need 20 per tick.
+            this.state.energy = Math.min(100, this.state.energy + 20);
+            this.state.mood = Math.min(100, this.state.mood + 5);
+        } else {
+            // Awake decay
+            this.state.energy -= CONSTANTS.DECAY.ENERGY;
+            this.state.hunger -= CONSTANTS.DECAY.HUNGER;
+            this.state.mood -= CONSTANTS.DECAY.MOOD;
+            this.state.social -= CONSTANTS.DECAY.SOCIAL;
+            this.state.hygiene -= CONSTANTS.DECAY.HYGIENE;
+            this.state.fun -= CONSTANTS.DECAY.FUN;
+        }
+
+        // Time processing
+        this.state.minute++;
+        if (this.state.minute >= 60) {
+            this.state.minute = 0;
+            this.state.hour++;
+            // Hourly checks
+            this.checkRandomEvents();
+        }
+        if (this.state.hour >= 24) {
+            this.state.hour = 0;
+            this.state.day++;
+            this.log(`📅 第 ${this.state.day} 天開始了`, "log-info");
+        }
+
+        // Constraints and Fail States
+        this.clampStats();
+        this.checkFailStates();
+        
+        // Wake up if full energy
+        if (this.state.isSleeping && this.state.energy >= 100) {
+            this.state.isSleeping = false;
+            this.log("體力已完全恢復！", "log-success");
+            this.updateCharacterEmoji('👩');
+        }
+
+        // Check for Superstar Promotion
+        if (this.state.careerLevel === 'debuted' && this.state.followers >= CONSTANTS.THRESHOLDS.SUPERSTAR_FANS) {
+            this.promoteToSuperstar();
+        }
+
+        this.updateUI();
+    }
+
+    promoteToSuperstar() {
+        this.state.careerLevel = 'superstar';
+        this.stopGameLoop();
+        this.showModal("🌟 巨星誕生！", "恭喜！你的粉絲數突破 1000 人，成為了家喻戶曉的超級巨星！", () => {
+             document.getElementById('career-badge').innerText = "超級巨星";
+             document.getElementById('career-badge').style.backgroundColor = "#e74c3c";
+             document.getElementById('career-badge').style.color = "white";
+             this.startGameLoop();
+        });
+        this.log("你成為了超級巨星！", "log-success");
+    }
+
+    clampStats() {
+        ['energy', 'hunger', 'mood', 'social', 'hygiene', 'fun'].forEach(stat => {
+            if (this.state[stat] < 0) this.state[stat] = 0;
+            if (this.state[stat] > 100) this.state[stat] = 100;
+        });
+    }
+
+    checkFailStates() {
+        if (this.state.hunger <= 0) {
+            this.gameOver("你餓昏了，被送進了醫院。偶像之路就此終結。");
+        }
+        if (this.state.energy <= 0 && !this.state.isSleeping) {
+            this.log("你太累了，直接昏倒在地...", "log-danger");
+            this.state.isSleeping = true;
+            this.state.energy = 10; // Small recovery to start sleep
+            this.updateCharacterEmoji('😴');
+        }
+    }
+
+    checkRandomEvents() {
+        // Only happen if awake
+        if (this.state.isSleeping) return;
+
+        const roll = Math.random();
+        
+        if (roll < 0.01) { // 1% chance per hour
+            this.log("🤒 你突然覺得身體不舒服 (生病)", "log-danger");
+            this.state.energy -= 20;
+            this.state.mood -= 20;
+        } else if (roll < 0.02 && this.state.followers > 1000) {
+            this.log("📸 狗仔隊偷拍到了你的素顏照！ (心情下降)", "log-warn");
+            this.state.mood -= 15;
+            this.state.followers -= 50;
+        } else if (roll < 0.03) {
+            this.log("💰 撿到錢了！", "log-success");
+            this.state.money += 100;
+        }
+    }
+
+    // --- Actions ---
+
+    action(type) {
+        if (this.state.isSleeping) {
+            this.log("你正在睡覺，無法行動。", "log-warn");
+            return;
+        }
+
+        // Cost check helper
+        const cost = (time, energyCost) => {
+            if (this.state.energy < energyCost) {
+                this.log("體力不足！去睡覺吧。", "log-danger");
+                return false;
+            }
+            this.state.minute += time; // Instant jump in time for action
+            this.state.energy -= energyCost;
+            return true;
+        };
+
+        switch(type) {
+            case 'sleep':
+                this.state.isSleeping = true;
+                this.updateCharacterEmoji('😴');
+                this.log("你躺上床睡覺...(極速恢復中)", "log-info");
+                break;
+            
+            case 'eat':
+                if (this.state.money < 20) {
+                    this.log("沒錢買飯吃！去工作吧。", "log-danger");
+                    return;
+                }
+                if (!cost(20, 0)) return;
+                this.state.money -= 20;
+                this.state.hunger = Math.min(100, this.state.hunger + 60);
+                this.log("你吃了一個便當。 (飢餓+60, -$20)", "log-success");
+                this.updateCharacterEmoji('😋');
+                break;
+
+            case 'shower':
+                if (!cost(15, 5)) return;
+                this.state.hygiene = 100;
+                this.log("你洗了個熱水澡。 (衛生滿)", "log-success");
+                this.updateCharacterEmoji('🚿');
+                break;
+
+            case 'chat':
+                if (!cost(30, 5)) return;
+                this.state.social = Math.min(100, this.state.social + 30);
+                this.log("你在網路上跟網友聊天。 (社交+30)", "log-info");
+                this.updateCharacterEmoji('💬');
+                break;
+
+            case 'practice':
+                if (this.state.hunger < 20 || this.state.hygiene < 20) {
+                    this.log("狀態太差，無法專心練習。", "log-warn");
+                    return;
+                }
+                if (!cost(60, 20)) return;
+                const skillGain = Math.floor(Math.random() * 3) + 1;
+                this.state.charisma += skillGain;
+                this.state.fitness += skillGain;
+                this.state.hygiene -= 10;
+                this.state.hunger -= 10;
+                this.log(`你看影片練習跳舞。(魅力+${skillGain}, 體格+${skillGain})`, "log-success");
+                this.updateCharacterEmoji('💃');
+                break;
+
+            case 'stream':
+                if (this.state.charisma < 15) {
+                    this.log("你的魅力還不足以吸引觀眾...先練習吧 (需魅力 15)。", "log-warn");
+                    return;
+                }
+                if (!cost(120, 25)) return;
+                const newFans = Math.floor((this.state.charisma + this.state.mood) / 5);
+                this.state.followers += newFans;
+                this.state.mood += 10;
+                this.state.social += 10;
+                this.state.fun += 30;
+                this.log(`你開了直播！新增 ${newFans} 粉絲 (娛樂+30)`, "log-success");
+                this.updateCharacterEmoji('📹');
+                break;
+
+            case 'work':
+                if (!cost(180, 40)) return;
+                const wage = 150;
+                this.state.money += wage;
+                this.state.mood -= 20;
+                this.state.fun -= 20;
+                this.log(`你接了一些修圖的外包工作。 (金錢+${wage}, 心情-20)`, "log-info");
+                this.updateCharacterEmoji('💻');
+                break;
+
+            case 'meet_npc':
+                if (!cost(30, 10)) return;
+                const npcOutcome = Math.random();
+                if (npcOutcome > 0.5) {
+                    this.state.social += 40;
+                    this.state.followers += 1;
+                    this.log("你和路人聊得很開心，他追蹤了你的IG。 (社交+40, 粉絲+1)", "log-success");
+                } else {
+                    this.state.social += 10;
+                    this.log("路人匆匆忙忙走掉了。", "log-info");
+                }
+                this.updateCharacterEmoji('🗣️');
+                break;
+            
+            case 'busking':
+                if(this.state.fitness < 30) {
+                    this.log("你的體力不足以支撐街頭表演...", "log-warn");
+                    return;
+                }
+                if (!cost(60, 30)) return;
+                const buskFans = Math.floor(this.state.charisma / 4);
+                const buskMoney = Math.floor(Math.random() * 50) + 10;
+                this.state.followers += buskFans;
+                this.state.money += buskMoney;
+                this.state.hygiene -= 20;
+                this.log(`你在公園街頭表演！ (粉絲+${buskFans}, 金錢+${buskMoney})`, "log-success");
+                this.updateCharacterEmoji('🎸');
+                break;
+
+            case 'audition':
+                if (this.state.followers < CONSTANTS.THRESHOLDS.AUDITION_FANS) {
+                    this.log(`粉絲不足！需要 ${CONSTANTS.THRESHOLDS.AUDITION_FANS} 名粉絲才能參加。`, "log-danger");
+                    return;
+                }
+                this.handleAudition();
+                break;
+        }
+
+        // Reset emoji after delay
+        if (!this.state.isSleeping) {
+            setTimeout(() => this.updateCharacterEmoji('👩'), 1500);
+        }
+        
+        this.updateUI(); // Force update after action
+    }
+
+    changeScene(sceneName) {
+        this.state.currentScene = sceneName;
+        const scene = SCENES[sceneName];
+        
+        // Update BG
+        document.getElementById('scene-bg').style.background = scene.bg;
+        document.getElementById('scene-title').innerText = scene.title;
+
+        // Toggle Buttons
+        document.querySelectorAll('.action-category').forEach(el => {
+            el.style.display = 'none';
+        });
+        
+        if (sceneName === 'home') {
+             document.getElementById('cat-home').style.display = 'flex';
+             document.getElementById('cat-pc').style.display = 'flex';
+             document.getElementById('btn-go-out').style.display = 'block';
+             document.getElementById('btn-go-out').innerText = "🚪 出門";
+             document.getElementById('btn-go-out').onclick = () => this.changeScene('outside');
+        } else {
+            scene.buttons.forEach(id => {
+                document.getElementById(id).style.display = 'flex';
+            });
+            // Configure navigation button for return
+            const navBtn = document.getElementById('btn-go-out');
+            navBtn.style.display = 'none'; // Map has its own "Go Home" button usually, or reuse nav
+        }
+        
+        this.log(`移動到了 ${scene.title}`, "log-info");
+    }
+
+    handleAudition() {
+        this.stopGameLoop();
+        const successChance = (this.state.charisma + this.state.fitness) / 4; 
+        const roll = Math.random() * 100;
+
+        let title, desc;
+        // Adjusted guaranteed success to 800 followers just in case stats are low but fans are high
+        if (roll < successChance || this.state.followers > 800) {
+            title = "試鏡成功！";
+            desc = "評審對你的表演印象深刻！你成功簽約出道了！(解鎖稱號：新人偶像)";
+            this.state.careerLevel = 'debuted';
+            this.state.money += 2000;
+            this.state.followers += 200; // Bonus fans
+            this.showModal(title, desc, () => {
+                document.getElementById('career-badge').innerText = "新人偶像";
+                document.getElementById('career-badge').style.backgroundColor = "gold";
+                this.startGameLoop();
+            });
+        } else {
+            title = "試鏡落選...";
+            desc = `評審覺得你還缺乏一些火候... (成功率: ${Math.floor(successChance)}%)\n再多練習魅力與體格吧！`;
+            this.state.mood -= 50;
+            this.showModal(title, desc, () => {
+                this.startGameLoop();
+            });
+        }
+    }
+
+    updateCharacterEmoji(emoji) {
+        const char = document.getElementById('character');
+        char.innerText = emoji;
+        if (emoji !== '👩') {
+            char.classList.add('bounce');
+        } else {
+            char.classList.remove('bounce');
+        }
+    }
+
+    log(msg, type = "") {
+        const timeStr = `${String(this.state.hour).padStart(2,'0')}:${String(this.state.minute).padStart(2,'0')}`;
+        const entry = document.createElement('div');
+        entry.className = "log-entry";
+        entry.innerHTML = `<span class="log-time">[${timeStr}]</span> <span class="${type}">${msg}</span>`;
+        this.logContainer.prepend(entry);
+    }
+
+    updateUI() {
+        // Time
+        document.getElementById('clock-display').innerText = `DAY ${this.state.day} - ${String(this.state.hour).padStart(2, '0')}:${String(this.state.minute).padStart(2, '0')}`;
+
+        // Stats
+        document.getElementById('stat-followers').innerText = this.state.followers;
+        document.getElementById('stat-charisma').innerText = this.state.charisma;
+        document.getElementById('stat-fitness').innerText = this.state.fitness;
+        document.getElementById('stat-money').innerText = this.state.money;
+
+        // Needs Bars
+        const needs = ['energy', 'hunger', 'mood', 'social', 'hygiene', 'fun'];
+        needs.forEach(need => {
+            const val = Math.floor(this.state[need]);
+            const bar = document.getElementById(`bar-${need}`);
+            const text = document.getElementById(`val-${need}`);
+            
+            bar.style.width = `${val}%`;
+            text.innerText = val;
+
+            // Color coding
+            if (val < 20) bar.style.backgroundColor = '#e74c3c'; // Red
+            else if (val < 50) bar.style.backgroundColor = '#f1c40f'; // Yellow
+            else bar.style.backgroundColor = '#2ecc71'; // Green
+        });
+
+        // Button States
+        const auditionBtn = document.getElementById('btn-audition');
+        if (this.state.followers >= CONSTANTS.THRESHOLDS.AUDITION_FANS && this.state.careerLevel === 'trainee') {
+            auditionBtn.disabled = false;
+            auditionBtn.innerText = "🏆 參加選秀 (可參加！)";
+        } else if (this.state.careerLevel !== 'trainee') {
+             auditionBtn.style.display = 'none'; // Hide if already debuted
+        } else {
+            auditionBtn.disabled = true;
+            auditionBtn.innerText = `🏆 選秀 (需 ${CONSTANTS.THRESHOLDS.AUDITION_FANS} 粉絲)`;
+        }
+    }
+
+    gameOver(reason) {
+        this.stopGameLoop();
+        this.showModal("GAME OVER", reason, () => location.reload());
+    }
+
+    showModal(title, desc, callback) {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-desc').innerText = desc;
+        const overlay = document.getElementById('modal-overlay');
+        overlay.style.display = 'flex';
+        
+        // Remove old listeners to avoid stacking
+        const btn = overlay.querySelector('button');
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        newBtn.onclick = () => {
+            overlay.style.display = 'none';
+            if (callback) callback();
+        };
+    }
+}
+
+// Start Game
+const game = new Game();
+
+</script>
+</body>
+</html>

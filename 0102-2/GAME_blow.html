@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Genshin Web - Tactical Combat (Fixed)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+        canvas { display: block; filter: contrast(1.1) brightness(1.1); }
+        
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; color: white; }
+        
+        /* Player Info */
+        .player-info { position: absolute; bottom: 40px; left: 40px; pointer-events: none; }
+        .character-name { font-size: 20px; margin-bottom: 8px; text-shadow: 0 0 10px #000; font-weight: bold; letter-spacing: 1px; }
+        .hp-bar { width: 300px; height: 12px; background: rgba(0,0,0,0.6); border: 1.5px solid #fff; border-radius: 6px; overflow: hidden; position: relative; }
+        #hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #42f593, #a2ffcf); transition: width 0.1s ease-out; }
+        .stamina-bar { width: 300px; height: 6px; background: rgba(0,0,0,0.5); margin-top: 5px; border-radius: 3px; overflow: hidden; }
+        #stamina-fill { width: 100%; height: 100%; background: #f1c40f; transition: width 0.1s; }
+
+        /* Charge Cursor */
+        #charge-ui { 
+            position: absolute; width: 60px; height: 60px; border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%; display: none; transform: translate(-50%, -50%); pointer-events: none;
+        }
+        #charge-fill { width: 100%; height: 100%; border: 3px solid #00fbff; border-radius: 50%; clip-path: inset(100% 0 0 0); position: absolute; top:-3px; left:-3px; }
+
+        /* Boss Bar */
+        .boss-bar { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); width: 600px; display: none; text-align: center; pointer-events: none; }
+        .boss-name { font-weight:bold; letter-spacing:3px; color:#ff4757; text-shadow:0 0 10px #000; margin-bottom: 5px; font-size: 18px; }
+        .b-hp-outer { width: 100%; height: 14px; background: rgba(0,0,0,0.7); border: 2px solid #ff4757; border-radius: 8px; overflow: hidden; }
+        #b-hp-inner { width: 100%; height: 100%; background: #ff4757; box-shadow: 0 0 15px #ff4757; transition: width 0.2s ease-out; }
+
+        /* Controls Help */
+        .controls-help {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px;
+            font-size: 14px; color: #ddd; line-height: 1.6;
+            backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);
+        }
+        .key { display: inline-block; background: #333; padding: 2px 6px; border-radius: 4px; border: 1px solid #555; font-family: monospace; font-weight: bold; color: #fff; margin: 0 2px; }
+
+        /* Game Over Screen */
+        #game-over {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+            color: white; pointer-events: auto; z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+        #game-over h1 { font-size: 48px; margin-bottom: 20px; color: #ff4757; text-shadow: 0 0 20px rgba(255, 71, 87, 0.5); }
+        #game-over p { font-size: 18px; color: #aaa; margin-bottom: 40px; }
+        .btn {
+            padding: 12px 30px; background: #fff; color: #000; font-size: 18px; font-weight: bold;
+            border: none; border-radius: 30px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover { transform: scale(1.05); box-shadow: 0 0 15px rgba(255,255,255,0.5); }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+<canvas id="game"></canvas>
+
+<div id="ui">
+    <div class="controls-help">
+        <div><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> 移動</div>
+        <div><span class="key">Shift</span> 衝刺</div>
+        <div><span class="key">左鍵</span> 攻擊 / 長按重擊</div>
+        <div><span class="key">E</span> 元素戰技</div>
+        <div><span class="key">Q</span> 元素爆發</div>
+    </div>
+
+    <div id="boss-ui" class="boss-bar">
+        <div class="boss-name" id="boss-name-text">BOSS NAME</div>
+        <div class="b-hp-outer"><div id="b-hp-inner"></div></div>
+    </div>
+
+    <div class="player-info">
+        <div class="character-name">旅行者 <span style="font-size: 14px; color: #aaa; font-weight: normal;">Lv.90</span></div>
+        <div class="hp-bar"><div id="hp-fill"></div></div>
+        <div class="stamina-bar"><div id="stamina-fill"></div></div>
+    </div>
+
+    <div id="charge-ui"><div id="charge-fill"></div></div>
+
+    <div id="game-over">
+        <h1>勝敗乃兵家常事</h1>
+        <p>大俠請重新來過</p>
+        <button class="btn" onclick="restartGame()">重新開始</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// --- Window & Resize ---
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Prevent stuck keys when alt-tabbing
+window.addEventListener('blur', () => {
+    keys = {};
+    player.isCharging = false;
+    player.charge = 0;
+    mouseHeld = false;
+    document.getElementById('charge-ui').style.display = 'none';
+});
+
+// --- Game Constants & State ---
+const BOSS_TYPES = [
+    { type: 'geo', name: '古岩龍蜥 · 擬態', color: '#ff4757', maxHp: 3000, speed: 2.5, shape: 'circle' },
+    { type: 'cryo', name: '急凍樹 · 核心', color: '#00d2d3', maxHp: 2200, speed: 0.8, shape: 'spiky' },
+    { type: 'electro', name: '無相之雷', color: '#a29bfe', maxHp: 1800, speed: 5.5, shape: 'square' }
+];
+
+let player = { 
+    x: 0, y: 0, size: 22, 
+    hp: 100, maxHp: 100,
+    stamina: 100, maxStamina: 100,
+    charge: 0, isCharging: false,
+    facing: 0, animTimer: 0,
+    attackAnim: 0, attackType: 'none', weaponAngle: 0,
+    dead: false
+};
+
+let enemies = [];
+let fx = [];
+let dmgNums = [];
+let projectiles = [];
+let camera = { x: 0, y: 0, shake: 0 };
+let boss = { active: false, x: 0, y: 0, hp: 100, max: 100, timer: 0, data: null, cooldown: 0 };
+
+let keys = {};
+let mouseHeld = false;
+let hitStop = 0;
+let mousePos = { x: window.innerWidth/2, y: window.innerHeight/2 };
+
+// Initialize
+player.x = window.innerWidth / 2;
+player.y = window.innerHeight / 2;
+for(let i=0; i<5; i++) spawnMob();
+
+// --- Input Handling ---
+// Mouse
+window.addEventListener('mousemove', e => {
+    mousePos.x = e.clientX;
+    mousePos.y = e.clientY;
+});
+window.addEventListener('mousedown', e => { 
+    if(e.button === 0 && !player.dead) { 
+        mouseHeld = true; 
+        player.isCharging = true; 
+    } 
+});
+window.addEventListener('mouseup', e => {
+    if(e.button === 0 && !player.dead) releaseAttack();
+});
+
+// Touch (Mobile Support)
+window.addEventListener('touchstart', e => {
+    if(e.target.closest('.btn')) return; // Allow clicking buttons
+    e.preventDefault();
+    if(player.dead) return;
+    mouseHeld = true;
+    player.isCharging = true;
+    mousePos.x = e.touches[0].clientX;
+    mousePos.y = e.touches[0].clientY;
+}, {passive: false});
+
+window.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if(player.dead) return;
+    mousePos.x = e.touches[0].clientX;
+    mousePos.y = e.touches[0].clientY;
+}, {passive: false});
+
+window.addEventListener('touchend', e => {
+    e.preventDefault();
+    if(player.dead) return;
+    releaseAttack();
+});
+
+function releaseAttack() {
+    if(player.charge > 40) useSkill('heavy'); 
+    else useSkill('light');
+    player.isCharging = false; 
+    player.charge = 0; 
+    mouseHeld = false;
+    document.getElementById('charge-ui').style.display = 'none';
+}
+
+// Keyboard
+window.addEventListener('keydown', e => { 
+    if(player.dead) return;
+    keys[e.code] = true;
+    if(e.code === 'KeyE') useSkill('e');
+    if(e.code === 'KeyQ') useSkill('q');
+    // Prevent scrolling
+    if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+// --- Core Functions ---
+function restartGame() {
+    document.getElementById('game-over').style.display = 'none';
+    player.hp = 100;
+    player.stamina = 100;
+    player.dead = false;
+    player.x = 0; player.y = 0;
+    
+    // Reset Entities
+    enemies = [];
+    projectiles = [];
+    fx = [];
+    dmgNums = [];
+    
+    // Reset Boss
+    boss.active = false;
+    boss.cooldown = 0;
+    document.getElementById('boss-ui').style.display = 'none';
+    
+    // Spawn initial mobs
+    for(let i=0; i<5; i++) spawnMob();
+}
+
+function spawnMob() {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 500 + Math.random() * 400;
+    // Spawn relative to player to avoid empty screen
+    enemies.push({ 
+        x: player.x + Math.cos(angle) * dist, 
+        y: player.y + Math.sin(angle) * dist, 
+        hp: 60, max: 60, 
+        size: 28, 
+        color: '#a29bfe',
+        pushX: 0, pushY: 0
+    });
+}
+
+function spawnBoss() {
+    if(boss.active || boss.cooldown > 0) return;
+    
+    const template = BOSS_TYPES[Math.floor(Math.random() * BOSS_TYPES.length)];
+    boss.active = true; 
+    boss.data = template;
+    boss.hp = template.maxHp; 
+    boss.max = template.maxHp;
+    boss.x = player.x + 400; 
+    boss.y = player.y;
+    boss.timer = 0;
+    
+    let ui = document.getElementById('boss-ui');
+    let nameTxt = document.getElementById('boss-name-text');
+    let hpBar = document.getElementById('b-hp-inner');
+    
+    ui.style.display = 'block';
+    nameTxt.innerText = template.name;
+    nameTxt.style.color = template.color;
+    hpBar.style.backgroundColor = template.color;
+    hpBar.style.boxShadow = `0 0 15px ${template.color}`;
+
+    camera.shake = 30;
+    createFX('burst', boss.x, boss.y, template.color, 500);
+}
+
+function useSkill(type) {
+    if(player.dead) return;
+
+    let dmg = 0, range = 0, knockback = 0;
+    player.attackAnim = 1;
+    player.attackType = type;
+
+    if(type === 'light') {
+        createFX('slash', player.x, player.y, '#fff', 90, player.facing);
+        range = 140; dmg = 15; knockback = 8;
+    } else if(type === 'heavy') {
+        createFX('burst', player.x, player.y, '#00fbff', 250);
+        camera.shake = 12;
+        range = 260; dmg = 50; knockback = 25;
+    } else if(type === 'e') {
+        createFX('ring', player.x, player.y, '#55efc4', 350);
+        camera.shake = 10;
+        range = 360; dmg = 70; knockback = 15;
+    } else if(type === 'q') {
+        createFX('ult', player.x, player.y, '#ffeaa7', 600);
+        camera.shake = 35; hitStop = 8;
+        range = 600; dmg = 200; knockback = 40;
+    }
+
+    hitDetect(range, dmg, knockback, type);
+}
+
+function hitDetect(range, dmg, knockback, type) {
+    let hitAnything = false;
+    
+    const checkAngle = (target) => {
+        if (type !== 'light') return true; 
+        let angleToTarget = Math.atan2(target.y - player.y, target.x - player.x);
+        let angleDiff = Math.abs(angleToTarget - player.facing);
+        if(angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+        return angleDiff < Math.PI / 2.5; 
+    };
+    
+    // Enemies
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let en = enemies[i];
+        let dist = Math.hypot(player.x - en.x, player.y - en.y);
+        
+        if(dist < range && checkAngle(en)) {
+            en.hp -= dmg; 
+            hitAnything = true;
+            createFX('particle', en.x, en.y, en.color, 10);
+            dmgNums.push({x: en.x, y: en.y, v: Math.floor(dmg), life: 40, color: '#fff'});
+            
+            let angle = Math.atan2(en.y - player.y, en.x - player.x);
+            en.pushX = Math.cos(angle) * knockback;
+            en.pushY = Math.sin(angle) * knockback;
+
+            if(en.hp <= 0) { 
+                enemies.splice(i, 1); 
+                spawnMob(); 
+                // Small chance to spawn boss if cooldown ready
+                if(!boss.active && boss.cooldown <= 0 && Math.random() > 0.85) spawnBoss(); 
+            }
+        }
+    }
+
+    // Boss
+    if(boss.active && boss.data) {
+        let dist = Math.hypot(player.x - boss.x, player.y - boss.y);
+        // Boss hitbox larger
+        if(dist < range + 60 && checkAngle(boss)) {
+            boss.hp -= dmg; 
+            hitAnything = true;
+            createFX('particle', boss.x + (Math.random()-0.5)*50, boss.y + (Math.random()-0.5)*50, boss.data.color, 15);
+            dmgNums.push({x: boss.x, y: boss.y - 60, v: Math.floor(dmg), life: 40, color: '#ffeb3b'});
+            camera.shake += 2;
+            if(dmg > 50) hitStop = 3;
+        }
+    }
+
+    if(hitAnything && type !== 'q') hitStop = 2;
+}
+
+function update() {
+    if(player.dead) return;
+
+    // Hitstop logic: skip logic updates, but allow draw to happen
+    if(hitStop > 0) { 
+        hitStop--; 
+        return; 
+    }
+
+    // --- Facing ---
+    let screenX = player.x - camera.x + canvas.width/2;
+    let screenY = player.y - camera.y + canvas.height/2;
+    player.facing = Math.atan2(mousePos.y - screenY, mousePos.x - screenX);
+
+    // --- Movement ---
+    let speed = 6;
+    let isSprinting = (keys['ShiftLeft'] || keys['ShiftRight']) && player.stamina > 0;
+    let moved = false;
+    
+    if (isSprinting) {
+        speed = 12;
+        player.stamina = Math.max(0, player.stamina - 1);
+        if(Math.random() > 0.5) fx.push({type: 'trail', x: player.x, y: player.y, size: player.size, color: 'rgba(255,255,255,0.2)', life: 10, max: 10});
+    } else {
+        player.stamina = Math.min(player.maxStamina, player.stamina + 0.5);
+    }
+
+    let mx = 0, my = 0;
+    if(keys['KeyW'] || keys['ArrowUp']) { my -= 1; moved = true; }
+    if(keys['KeyS'] || keys['ArrowDown']) { my += 1; moved = true; }
+    if(keys['KeyA'] || keys['ArrowLeft']) { mx -= 1; moved = true; }
+    if(keys['KeyD'] || keys['ArrowRight']) { mx += 1; moved = true; }
+
+    if (moved) {
+        player.animTimer += isSprinting ? 0.4 : 0.2;
+        let len = Math.hypot(mx, my);
+        if(len > 0) { // Prevent div by zero
+            mx /= len; my /= len;
+            player.x += mx * speed;
+            player.y += my * speed;
+        }
+    } else {
+        player.animTimer = 0;
+    }
+
+    // --- Weapon Anim ---
+    if (player.attackAnim > 0) {
+        player.attackAnim -= 0.1; 
+        if(player.attackAnim < 0) player.attackAnim = 0;
+        
+        if (player.attackType === 'light') {
+            player.weaponAngle = -1 + (1 - player.attackAnim) * 2; 
+        } else if (player.attackType === 'spin' || player.attackType === 'e') {
+            player.weaponAngle += 0.5;
+        } else {
+            player.weaponAngle = 0;
+        }
+    } else {
+        player.weaponAngle = Math.sin(Date.now() / 500) * 0.1 + 0.2; 
+    }
+
+    // --- Charge Logic ---
+    if(player.isCharging) {
+        player.charge = Math.min(100, player.charge + 2.5);
+        let cui = document.getElementById('charge-ui');
+        let sx = player.x - camera.x + canvas.width/2;
+        let sy = player.y - camera.y + canvas.height/2;
+        
+        cui.style.display = 'block'; 
+        cui.style.left = sx + 'px'; cui.style.top = sy + 'px';
+        document.getElementById('charge-fill').style.clipPath = `inset(${100 - player.charge}% 0 0 0)`;
+        
+        if(player.charge === 100 && Math.random() > 0.8) {
+            camera.shake = 1;
+            createFX('particle', player.x, player.y, '#00fbff', 1);
+        }
+    }
+
+    // --- Boss Logic ---
+    if(boss.cooldown > 0) boss.cooldown--;
+
+    if(boss.active && boss.data) {
+        boss.timer++;
+        
+        // Move
+        let dx = player.x - boss.x;
+        let dy = player.y - boss.y;
+        let dist = Math.hypot(dx, dy);
+        let moveSpeed = boss.data.speed;
+        
+        // Electro burst speed
+        if(boss.data.type === 'electro') {
+            if(boss.timer % 60 < 20) moveSpeed = 12; else moveSpeed = 1;
+        }
+
+        if (dist > 100) {
+            boss.x += (dx / dist) * moveSpeed;
+            boss.y += (dy / dist) * moveSpeed;
+        }
+
+        // Attacks
+        if (boss.data.type === 'geo') {
+            if(boss.timer % 180 === 0) {
+                createFX('ring', boss.x, boss.y, boss.data.color, 400);
+                 if(dist < 400 && !isSprinting) {
+                     takeDamage(25);
+                     camera.shake = 20;
+                     dmgNums.push({x: player.x, y: player.y, v: "受到衝擊!", life: 60, color: '#ff0000'});
+                 }
+            }
+        } else if (boss.data.type === 'cryo') {
+            if(boss.timer % 100 === 0) {
+                for(let k=0; k<3; k++) {
+                     projectiles.push({
+                        x: boss.x, y: boss.y,
+                        vx: Math.cos(Math.atan2(dy, dx) + (k-1)*0.3) * 7,
+                        vy: Math.sin(Math.atan2(dy, dx) + (k-1)*0.3) * 7,
+                        life: 100, color: '#00d2d3', dmg: 15
+                     });
+                }
+            }
+        } else if (boss.data.type === 'electro') {
+            if(boss.timer % 40 === 0) {
+                createFX('particle', boss.x, boss.y, '#a29bfe', 5);
+                if (Math.random() > 0.5) {
+                    projectiles.push({
+                        x: player.x, y: player.y, 
+                        vx: 0, vy: 0, 
+                        life: 40, color: '#a29bfe', dmg: 20, isAOE: true
+                    });
+                }
+            }
+        }
+        
+        // Boss Death
+        if(boss.hp <= 0) { 
+            boss.active = false; 
+            boss.cooldown = 300; // 5 seconds cooldown
+            document.getElementById('boss-ui').style.display = 'none'; 
+            createFX('ult', boss.x, boss.y, '#fff', 800); 
+            player.hp = Math.min(player.maxHp, player.hp + 50);
+            dmgNums.push({x: player.x, y: player.y - 50, v: "BOSS DEFEATED", life: 100, color: '#ffd700'});
+        }
+    }
+
+    // --- Projectiles ---
+    for(let i = projectiles.length - 1; i >= 0; i--) {
+        let p = projectiles[i];
+        if(!p.isAOE) { p.x += p.vx; p.y += p.vy; }
+        p.life--;
+        
+        let d = Math.hypot(p.x - player.x, p.y - player.y);
+        
+        if (p.isAOE) {
+            if (p.life === 1) { 
+                 createFX('burst', p.x, p.y, p.color, 100);
+                 if(d < 100 && !isSprinting) {
+                    takeDamage(p.dmg);
+                    camera.shake = 10;
+                 }
+            }
+        } else {
+             if(d < player.size + 10) {
+                takeDamage(p.dmg);
+                projectiles.splice(i, 1);
+                continue;
+            }
+        }
+        if(p.life <= 0) projectiles.splice(i, 1);
+    }
+
+    // --- Enemies ---
+    enemies.forEach(en => {
+        en.x += en.pushX; en.y += en.pushY;
+        en.pushX *= 0.8; en.pushY *= 0.8;
+        let dx = player.x - en.x, dy = player.y - en.y;
+        let dist = Math.hypot(dx, dy);
+        if(dist > 30) { en.x += (dx/dist) * 2; en.y += (dy/dist) * 2; }
+        if(dist < 30) takeDamage(0.2); // Continuous damage
+        
+        enemies.forEach(other => {
+            if(en === other) return;
+            let d = Math.hypot(en.x - other.x, en.y - other.y);
+            if(d < en.size * 2) {
+                let pushAngle = Math.atan2(en.y - other.y, en.x - other.x);
+                en.x += Math.cos(pushAngle) * 0.5; en.y += Math.sin(pushAngle) * 0.5;
+            }
+        });
+    });
+
+    // --- Camera ---
+    camera.x += (player.x - camera.x) * 0.1;
+    camera.y += (player.y - camera.y) * 0.1;
+    if(camera.shake > 0) {
+        camera.shake *= 0.9;
+        if(camera.shake < 0.5) camera.shake = 0;
+    }
+
+    // --- UI Update ---
+    document.getElementById('hp-fill').style.width = Math.max(0, (player.hp / player.maxHp) * 100) + "%";
+    document.getElementById('stamina-fill').style.width = (player.stamina / player.maxStamina * 100) + "%";
+    if(boss.active) document.getElementById('b-hp-inner').style.width = Math.max(0, (boss.hp/boss.max*100)) + "%";
+
+    // --- FX ---
+    for(let i = fx.length - 1; i >= 0; i--) {
+        let f = fx[i]; f.life--;
+        if(f.type === 'particle') { f.x += f.vx; f.y += f.vy; f.vy += 0.2; }
+        if(f.life <= 0) fx.splice(i, 1);
+    }
+    for(let i = dmgNums.length - 1; i >= 0; i--) {
+        let n = dmgNums[i]; n.y -= 1; n.life--;
+        if(n.life <= 0) dmgNums.splice(i, 1);
+    }
+}
+
+function takeDamage(amount) {
+    if(player.dead) return;
+    player.hp -= amount;
+    if(player.hp <= 0) {
+        player.hp = 0;
+        player.dead = true;
+        document.getElementById('game-over').style.display = 'flex';
+        document.getElementById('charge-ui').style.display = 'none';
+        document.getElementById('boss-ui').style.display = 'none';
+    }
+}
+
+function createFX(type, x, y, color, size, angle = 0) {
+    if(type === 'particle') {
+        for(let i=0; i<size; i++) {
+            fx.push({ type: 'particle', x, y, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 20 + Math.random()*15, color });
+        }
+    } else {
+        fx.push({ type, x, y, color, size, life: 25, max: 25, angle });
+    }
+}
+
+function draw() {
+    update();
+    
+    // Clear
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2);
+    ctx.translate(-camera.x, -camera.y);
+    if(camera.shake > 0) ctx.translate((Math.random()-0.5)*camera.shake, (Math.random()-0.5)*camera.shake);
+
+    // Floor
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.beginPath();
+    let gridSize = 100;
+    let startX = Math.floor((camera.x - canvas.width) / gridSize) * gridSize;
+    let endX = Math.floor((camera.x + canvas.width) / gridSize) * gridSize;
+    let startY = Math.floor((camera.y - canvas.height) / gridSize) * gridSize;
+    let endY = Math.floor((camera.y + canvas.height) / gridSize) * gridSize;
+    for(let x = startX; x <= endX; x += gridSize) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
+    for(let y = startY; y <= endY; y += gridSize) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); }
+    ctx.stroke();
+
+    // Enemies
+    enemies.forEach(en => {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(en.x, en.y + en.size, en.size, en.size*0.3, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = en.color; ctx.beginPath(); ctx.arc(en.x, en.y, en.size, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#333'; ctx.fillRect(en.x-20, en.y-45, 40, 4);
+        ctx.fillStyle = '#ff4757'; ctx.fillRect(en.x-20, en.y-45, (en.hp/en.max)*40, 4);
+    });
+
+    // Boss
+    if(boss.active && boss.data) {
+        // Warning
+        if(boss.timer % 150 > 120 && boss.data.type !== 'electro') {
+            ctx.strokeStyle = `rgba(255, 71, 87, 0.3)`; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(boss.x, boss.y, 400, 0, Math.PI*2); ctx.stroke();
+        }
+
+        ctx.shadowBlur = 40; ctx.shadowColor = boss.data.color; ctx.fillStyle = '#2d3436';
+        
+        if (boss.data.shape === 'square') {
+             ctx.fillRect(boss.x - 60, boss.y - 60, 120, 120);
+             ctx.fillStyle = boss.data.color; ctx.fillRect(boss.x - 20, boss.y - 20, 40, 40);
+        } else if (boss.data.shape === 'spiky') {
+            ctx.beginPath();
+            for(let i=0; i<8; i++) {
+                let a = (Math.PI*2 * i)/8;
+                ctx.lineTo(boss.x + Math.cos(a)*80, boss.y + Math.sin(a)*80);
+                ctx.lineTo(boss.x + Math.cos(a+0.4)*40, boss.y + Math.sin(a+0.4)*40);
+            }
+            ctx.fill();
+            ctx.fillStyle = boss.data.color; ctx.beginPath(); ctx.arc(boss.x, boss.y, 25, 0, Math.PI*2); ctx.fill();
+        } else {
+            ctx.beginPath(); ctx.arc(boss.x, boss.y, 60, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = boss.data.color; ctx.beginPath(); ctx.arc(boss.x, boss.y, 20, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+    }
+
+    // Projectiles
+    projectiles.forEach(p => {
+        if(p.isAOE) {
+             ctx.strokeStyle = p.color; ctx.lineWidth = 2;
+             ctx.setLineDash([5, 5]);
+             ctx.beginPath(); ctx.arc(p.x, p.y, 100 * (1 - p.life/40), 0, Math.PI*2); ctx.stroke();
+             ctx.setLineDash([]);
+        } else {
+             ctx.fillStyle = p.color; ctx.shadowBlur = 10; ctx.shadowColor = p.color;
+             ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI*2); ctx.fill();
+             ctx.shadowBlur = 0;
+        }
+    });
+
+    // Player
+    if (!player.dead) {
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.facing); 
+
+        // Hands
+        let handOffset = Math.sin(player.animTimer) * 5;
+        ctx.fillStyle = '#eee';
+        ctx.beginPath(); ctx.arc(15, -15 + handOffset, 6, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(15, 15 - handOffset, 6, 0, Math.PI*2); ctx.fill();
+
+        // Weapon
+        ctx.save();
+        ctx.translate(15, 15 - handOffset); 
+        ctx.rotate(player.weaponAngle); 
+        ctx.fillStyle = '#e2e2e2'; ctx.shadowBlur = 10; ctx.shadowColor = '#fff'; ctx.fillRect(0, -3, 50, 6);
+        ctx.fillStyle = '#f1c40f'; ctx.shadowBlur = 0; ctx.fillRect(0, -5, 12, 10);
+        ctx.restore();
+
+        // Body
+        ctx.shadowBlur = 15; ctx.shadowColor = player.charge > 80 ? '#00fbff' : 'rgba(255,255,255,0.2)';
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, player.size, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(10, -8, 3, 0, Math.PI*2); ctx.fill(); 
+        ctx.beginPath(); ctx.arc(10, 8, 3, 0, Math.PI*2); ctx.fill(); 
+
+        ctx.restore(); 
+    }
+
+    // FX
+    fx.forEach(f => {
+        ctx.globalAlpha = f.life / f.max ? (f.life / f.max) : (f.life/25);
+        if (f.type === 'trail') ctx.globalAlpha = f.life / 10 * 0.5;
+        ctx.lineWidth = 4; ctx.strokeStyle = f.color;
+        
+        if(f.type === 'trail') {
+             ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(f.x, f.y, f.size, 0, Math.PI*2); ctx.fill();
+        } else if(f.type === 'slash') {
+            ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.angle);
+            ctx.beginPath(); ctx.arc(0, 0, 90, -Math.PI/3, Math.PI/3); ctx.stroke();
+            ctx.restore();
+        } else if(f.type === 'ring' || f.type === 'burst') {
+            ctx.beginPath(); ctx.arc(f.x, f.y, f.size * (1-f.life/25), 0, Math.PI*2); ctx.stroke();
+        } else if(f.type === 'ult') {
+            ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(f.x, f.y, f.size * (1-f.life/25), 0, Math.PI*2); ctx.fill();
+        } else if(f.type === 'particle') {
+            ctx.fillStyle = f.color; ctx.fillRect(f.x, f.y, 4, 4);
+        }
+        ctx.globalAlpha = 1;
+    });
+
+    // Dmg Nums
+    dmgNums.forEach(n => { 
+        ctx.fillStyle = n.color || '#fff'; ctx.font = 'bold 20px "Segoe UI", sans-serif'; 
+        ctx.strokeStyle = 'black'; ctx.lineWidth = 3;
+        ctx.strokeText(n.v, n.x, n.y); ctx.fillText(n.v, n.x, n.y); 
+    });
+
+    ctx.restore();
+    
+    requestAnimationFrame(draw);
+}
+
+// Start
+requestAnimationFrame(draw);
+
+</script>
+</body>
+</html>

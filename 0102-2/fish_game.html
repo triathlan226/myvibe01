@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>可愛卡通釣魚樂</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #333;
+            font-family: 'Fredoka One', cursive, sans-serif;
+            touch-action: none; /* Prevent zoom/scroll on mobile */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #4FC3F7 0%, #29B6F6 50%, #0288D1 100%);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Layer */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through to canvas */
+        }
+
+        .hud-element {
+            position: absolute;
+            color: white;
+            text-shadow: 2px 2px 0px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+        }
+
+        #score-display {
+            top: 20px;
+            left: 20px;
+            font-size: 28px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 3px solid #fff;
+        }
+
+        #timer-display {
+            top: 20px;
+            right: 20px;
+            font-size: 28px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 3px solid #fff;
+        }
+
+        #progress-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 25px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            border: 3px solid white;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #FFEB3B, #FFC107);
+            transition: width 0.3s ease-out;
+        }
+
+        #target-text {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 18px;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        /* Screens (Start/GameOver) */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            pointer-events: auto;
+            z-index: 100;
+        }
+
+        .screen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #FFEB3B;
+            text-shadow: 4px 4px 0px #F57F17;
+        }
+
+        .screen p {
+            font-size: 24px;
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        .btn {
+            background: #4CAF50;
+            border: none;
+            padding: 15px 40px;
+            font-size: 24px;
+            color: white;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #2E7D32;
+            font-family: 'Fredoka One', cursive, sans-serif;
+            transition: transform 0.1s;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #2E7D32;
+        }
+
+        /* Mini-Game Overlay */
+        #minigame-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 4px solid #333;
+            border-radius: 30px;
+            display: none; /* Hidden by default */
+            overflow: hidden;
+            pointer-events: none; /* Clicks are handled by global listener */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        #minigame-target-area {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: rgba(76, 175, 80, 0.3);
+            border-left: 2px dashed #4CAF50;
+            border-right: 2px dashed #4CAF50;
+        }
+
+        #minigame-fish {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 30px;
+        }
+
+        #minigame-hook {
+            position: absolute;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: #F44336;
+            left: 0;
+            z-index: 10;
+        }
+        
+        #minigame-hook::after {
+            content: '⚓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+        }
+
+        #minigame-instruction {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 20px;
+            white-space: nowrap;
+            text-shadow: 1px 1px 2px black;
+            animation: pulse 1s infinite;
+        }
+
+        /* Floating Text Animation */
+        .floating-text {
+            position: absolute;
+            font-size: 32px;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            z-index: 50;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+        }
+
+        @keyframes pulse {
+            0% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.1); }
+            100% { transform: translateX(-50%) scale(1); }
+        }
+
+        @keyframes rainbow {
+            0% { box-shadow: inset 0 0 50px red; }
+            20% { box-shadow: inset 0 0 50px orange; }
+            40% { box-shadow: inset 0 0 50px yellow; }
+            60% { box-shadow: inset 0 0 50px green; }
+            80% { box-shadow: inset 0 0 50px blue; }
+            100% { box-shadow: inset 0 0 50px violet; }
+        }
+
+        .legendary-effect {
+            animation: rainbow 0.5s linear infinite;
+        }
+
+        #hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui-layer">
+        <div id="score-display" class="hud-element">分數: <span id="score-val">0</span></div>
+        <div id="timer-display" class="hud-element">時間: <span id="time-val">90</span></div>
+        
+        <div id="target-text">目標: 500 分</div>
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+
+        <div id="minigame-container">
+            <div id="minigame-instruction">點擊捕捉！</div>
+            <div id="minigame-target-area"></div>
+            <div id="minigame-fish">🐟</div>
+            <div id="minigame-hook"></div>
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen">
+        <h1>可愛卡通釣魚樂</h1>
+        <p>
+            目標：90秒內獲得 500 分！<br><br>
+            點擊水面拋竿<br>
+            當指標與魚重疊時點擊捕捉！
+        </p>
+        <button class="btn" onclick="game.start()">開始釣魚</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="screen" style="display: none;">
+        <h1 id="end-title">時間到！</h1>
+        <p id="end-message">你的分數是...</p>
+        <button class="btn" onclick="game.reset()">再來一次</button>
+    </div>
+</div>
+
+<script>
+/**
+ * Game Configuration
+ */
+const CONFIG = {
+    targetScore: 500,
+    timeLimit: 90,
+    fishTypes: {
+        common: { name: "普通魚", score: 10, color: "#90CAF9", emoji: "🐟", speed: 0.02, size: 60, tolerance: 50 },
+        rare: { name: "稀有魚", score: 50, color: "#FFD54F", emoji: "🐠", speed: 0.04, size: 40, tolerance: 30 },
+        legendary: { name: "傳奇寶藏", score: 200, color: "#FF4081", emoji: "👑", speed: 0.07, size: 25, tolerance: 20 }
+    }
+};
+
+/**
+ * Utility Functions
+ */
+function randomRange(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+/**
+ * Renderer Class: Handles Canvas Drawing
+ */
+class Renderer {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        
+        // Assets properties
+        this.sunY = 50;
+        this.waveOffset = 0;
+    }
+
+    resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+    }
+
+    clear() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    drawSky() {
+        // Gradient is handled by CSS, we just draw elements
+        // Sun
+        this.ctx.save();
+        this.ctx.translate(100, 80);
+        this.ctx.fillStyle = "#FFEB3B";
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 40, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Sun rays
+        this.ctx.strokeStyle = "rgba(255, 235, 59, 0.5)";
+        this.ctx.lineWidth = 4;
+        let time = Date.now() / 1000;
+        for(let i=0; i<8; i++) {
+            this.ctx.rotate(Math.PI / 4);
+            this.ctx.beginPath();
+            this.ctx.moveTo(50 + Math.sin(time)*5, 0);
+            this.ctx.lineTo(70 + Math.sin(time)*5, 0);
+            this.ctx.stroke();
+        }
+        this.ctx.restore();
+
+        // Clouds
+        this.drawCloud(200 + Math.sin(time * 0.1) * 20, 100, 0.8);
+        this.drawCloud(this.canvas.width - 150 + Math.sin(time * 0.15) * 30, 60, 1.2);
+    }
+
+    drawCloud(x, y, scale) {
+        this.ctx.save();
+        this.ctx.translate(x, y);
+        this.ctx.scale(scale, scale);
+        this.ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 30, 0, Math.PI * 2);
+        this.ctx.arc(25, -10, 35, 0, Math.PI * 2);
+        this.ctx.arc(50, 0, 30, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.restore();
+    }
+
+    drawWater() {
+        let waterLevel = this.canvas.height * 0.4;
+        this.ctx.fillStyle = "#29B6F6";
+        this.ctx.fillRect(0, waterLevel, this.canvas.width, this.canvas.height - waterLevel);
+
+        // Waves
+        this.ctx.fillStyle = "#4FC3F7"; // Lighter water top
+        this.ctx.beginPath();
+        this.waveOffset += 0.05;
+        this.ctx.moveTo(0, waterLevel);
+        for(let i=0; i<=this.canvas.width; i+=20) {
+            let y = waterLevel + Math.sin(i * 0.02 + this.waveOffset) * 10;
+            this.ctx.lineTo(i, y);
+        }
+        this.ctx.lineTo(this.canvas.width, this.canvas.height);
+        this.ctx.lineTo(0, this.canvas.height);
+        this.ctx.fill();
+
+        // Surface shine
+        this.ctx.fillStyle = "rgba(255,255,255,0.2)";
+        for(let i=0; i<5; i++) {
+             let x = (Date.now()/20 + i*200) % (this.canvas.width + 100) - 50;
+             let y = waterLevel + 50 + i * 40;
+             this.ctx.fillRect(x, y, 60, 5);
+        }
+    }
+
+    drawPierAndFisherman(state, rodAngle) {
+        // Pier
+        let pierH = 200;
+        let pierW = 300;
+        let pierX = this.canvas.width / 2 - pierW / 2;
+        let pierY = this.canvas.height * 0.65; // Positioned lower
+
+        // Posts
+        this.ctx.fillStyle = "#795548"; // Wood dark
+        this.ctx.fillRect(pierX + 20, pierY, 20, 300);
+        this.ctx.fillRect(pierX + pierW - 40, pierY, 20, 300);
+
+        // Deck
+        this.ctx.fillStyle = "#8D6E63"; // Wood light
+        this.ctx.fillRect(pierX - 20, pierY, pierW + 40, 40);
+        
+        // Deck planks detail
+        this.ctx.fillStyle = "#6D4C41";
+        for(let i=0; i<pierW+40; i+=30) {
+             this.ctx.fillRect(pierX - 20 + i, pierY, 2, 40);
+        }
+
+        // Fisherman Position
+        let charX = this.canvas.width / 2;
+        let charY = pierY - 10;
+
+        // Fisherman Body
+        this.ctx.fillStyle = "#FF7043"; // Orange shirt
+        this.ctx.beginPath();
+        this.ctx.ellipse(charX, charY - 30, 25, 40, 0, 0, Math.PI*2);
+        this.ctx.fill();
+
+        // Head
+        this.ctx.fillStyle = "#FFE0B2"; // Skin
+        this.ctx.beginPath();
+        this.ctx.arc(charX, charY - 80, 25, 0, Math.PI*2);
+        this.ctx.fill();
+
+        // Hat
+        this.ctx.fillStyle = "#FFF";
+        this.ctx.beginPath();
+        this.ctx.arc(charX, charY - 90, 26, Math.PI, 0); // Dome
+        this.ctx.fillRect(charX - 35, charY - 90, 70, 10); // Brim
+        this.ctx.fill();
+
+        // Eyes (Cute blink logic could go here, keeping simple)
+        this.ctx.fillStyle = "#333";
+        this.ctx.beginPath();
+        this.ctx.arc(charX - 8, charY - 80, 3, 0, Math.PI*2);
+        this.ctx.arc(charX + 8, charY - 80, 3, 0, Math.PI*2);
+        this.ctx.fill();
+        
+        // Rod
+        this.ctx.save();
+        this.ctx.translate(charX + 15, charY - 50); // Pivot at hand
+        this.ctx.rotate(rodAngle); // Rotate rod based on state
+        
+        // Rod Stick
+        this.ctx.strokeStyle = "#5D4037";
+        this.ctx.lineWidth = 6;
+        this.ctx.lineCap = "round";
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, 0);
+        this.ctx.lineTo(80, -80);
+        this.ctx.stroke();
+
+        // Reel
+        this.ctx.fillStyle = "#444";
+        this.ctx.beginPath();
+        this.ctx.arc(15, -15, 8, 0, Math.PI*2);
+        this.ctx.fill();
+
+        // Eye on rod (Cute feature)
+        this.ctx.fillStyle = "white";
+        this.ctx.beginPath();
+        this.ctx.arc(70, -70, 6, 0, Math.PI*2);
+        this.ctx.fill();
+        this.ctx.fillStyle = "black";
+        this.ctx.beginPath();
+        this.ctx.arc(71, -71, 2, 0, Math.PI*2);
+        this.ctx.fill();
+
+        // Line and Hook Point
+        let rodTipX = 80;
+        let rodTipY = -80;
+        
+        this.ctx.restore(); // Undo rotation to get world coordinates of tip? No, complex.
+        
+        // Calculate tip in world space
+        let angle = rodAngle;
+        let tipWorldX = (charX + 15) + (Math.cos(angle) * 80 - Math.sin(angle) * -80);
+        let tipWorldY = (charY - 50) + (Math.sin(angle) * 80 + Math.cos(angle) * -80);
+        
+        return { x: tipWorldX, y: tipWorldY };
+    }
+
+    drawLineAndHook(startX, startY, endX, endY) {
+        // Line
+        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(startX, startY);
+        // Curve the line slightly like a catenary
+        this.ctx.quadraticCurveTo(startX, endY, endX, endY);
+        this.ctx.stroke();
+
+        // Star Hook
+        this.drawStar(endX, endY, 5, 12, 6);
+    }
+
+    drawStar(cx, cy, spikes, outerRadius, innerRadius) {
+        let rot = Math.PI / 2 * 3;
+        let x = cx;
+        let y = cy;
+        let step = Math.PI / spikes;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(cx, cy - outerRadius);
+        for (let i = 0; i < spikes; i++) {
+            x = cx + Math.cos(rot) * outerRadius;
+            y = cy + Math.sin(rot) * outerRadius;
+            this.ctx.lineTo(x, y);
+            rot += step;
+
+            x = cx + Math.cos(rot) * innerRadius;
+            y = cy + Math.sin(rot) * innerRadius;
+            this.ctx.lineTo(x, y);
+            rot += step;
+        }
+        this.ctx.lineTo(cx, cy - outerRadius);
+        this.ctx.closePath();
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeStyle = '#FFD700'; // Gold
+        this.ctx.stroke();
+        this.ctx.fillStyle = '#FFF176';
+        this.ctx.fill();
+    }
+
+    drawExclamation(x, y) {
+        this.ctx.font = "bold 40px Arial";
+        this.ctx.fillStyle = "red";
+        this.ctx.strokeStyle = "white";
+        this.ctx.lineWidth = 2;
+        this.ctx.fillText("!", x, y - 40);
+        this.ctx.strokeText("!", x, y - 40);
+    }
+}
+
+/**
+ * Main Game Class
+ */
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.renderer = new Renderer(this.canvas);
+        
+        // Game State
+        this.state = 'MENU'; // MENU, IDLE, CASTING, WAITING, BITE, FISHING, REELING, GAMEOVER
+        this.score = 0;
+        this.timeLeft = CONFIG.timeLimit;
+        
+        // Rod & Physics
+        this.rodAngle = -Math.PI / 4;
+        this.hookPos = { x: 0, y: 0 };
+        this.targetHookPos = { x: 0, y: 0 };
+        
+        // Fishing Logic
+        this.biteTimer = 0;
+        this.currentFish = null;
+        this.miniGameData = {
+            fishPos: 50, // 0-100
+            hookPos: 50, // 0-100
+            hookVelocity: 1, // Automatic movement speed
+            direction: 1
+        };
+
+        this.lastTime = 0;
+        
+        // UI Bindings
+        this.scoreEl = document.getElementById('score-val');
+        this.timeEl = document.getElementById('time-val');
+        this.progressEl = document.getElementById('progress-bar');
+        this.minigameEl = document.getElementById('minigame-container');
+        this.minigameFish = document.getElementById('minigame-fish');
+        this.minigameHook = document.getElementById('minigame-hook');
+        this.minigameTarget = document.getElementById('minigame-target-area');
+        this.container = document.getElementById('game-container');
+
+        // Input
+        this.container.addEventListener('mousedown', (e) => this.handleInput(e));
+        this.container.addEventListener('touchstart', (e) => { e.preventDefault(); this.handleInput(e); }, {passive: false});
+
+        // Loop
+        requestAnimationFrame((t) => this.loop(t));
+    }
+
+    start() {
+        this.state = 'IDLE';
+        this.score = 0;
+        this.timeLeft = CONFIG.timeLimit;
+        this.updateUI();
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('game-over-screen').style.display = 'none';
+        
+        // Reset Rod
+        this.rodAngle = -Math.PI / 4;
+        
+        // Timer
+        if (this.timerInterval) clearInterval(this.timerInterval);
+        this.timerInterval = setInterval(() => {
+            if (this.state !== 'MENU' && this.state !== 'GAMEOVER') {
+                this.timeLeft--;
+                if (this.timeLeft <= 0) {
+                    this.endGame();
+                }
+                this.updateUI();
+            }
+        }, 1000);
+    }
+
+    reset() {
+        this.start();
+    }
+
+    endGame() {
+        this.state = 'GAMEOVER';
+        clearInterval(this.timerInterval);
+        document.getElementById('end-title').innerText = this.score >= CONFIG.targetScore ? "恭喜勝利！🎉" : "時間到！";
+        document.getElementById('end-message').innerText = `最終分數: ${this.score} / ${CONFIG.targetScore}`;
+        document.getElementById('game-over-screen').style.display = 'flex';
+        this.minigameEl.style.display = 'none';
+    }
+
+    handleInput(e) {
+        if (this.state === 'IDLE') {
+            // Cast Line
+            this.state = 'CASTING';
+            // Determine cast target based on click x/y or random nearby
+            let rect = this.canvas.getBoundingClientRect();
+            let x = (e.clientX || e.touches[0].clientX) - rect.left;
+            let y = (e.clientY || e.touches[0].clientY) - rect.top;
+            
+            // Limit cast to water area
+            if (y < this.canvas.height * 0.45) y = this.canvas.height * 0.5;
+            
+            this.targetHookPos = { x: x, y: y };
+            // Animation triggered in loop
+            
+        } else if (this.state === 'FISHING') {
+            // Mini-game interaction
+            this.checkCatch();
+        }
+    }
+
+    pickRandomFish() {
+        let r = Math.random();
+        if (r > 0.90) return CONFIG.fishTypes.legendary;
+        if (r > 0.60) return CONFIG.fishTypes.rare;
+        return CONFIG.fishTypes.common;
+    }
+
+    startMiniGame() {
+        this.state = 'FISHING';
+        this.minigameEl.style.display = 'block';
+        
+        this.currentFish = this.pickRandomFish();
+        
+        // Setup Mini-game visual
+        this.minigameFish.innerText = this.currentFish.emoji;
+        this.minigameTarget.style.width = this.currentFish.size + 'px';
+        this.minigameTarget.style.left = '50%'; // Initial center
+        
+        this.miniGameData.fishPos = 50;
+        this.miniGameData.hookPos = 50;
+        this.miniGameData.direction = 1;
+        this.miniGameData.time = 0;
+    }
+
+    checkCatch() {
+        // Calculate collision
+        // Convert CSS percentages/pixels logic to code logic
+        // Container width = 300px.
+        // FishPos (0-100) -> Center of fish.
+        // HookPos (0-100) -> Center of hook.
+        
+        let diff = Math.abs(this.miniGameData.fishPos - this.miniGameData.hookPos);
+        // Convert diff to pixels approx (300px width) -> 1% = 3px
+        // Tolerance is in pixels roughly in config? Let's treat config tolerance as % for simplicity or scale it
+        // Let's use config tolerance as "Max Distance %"
+        
+        // Visual width of target is size (px).
+        // 300px width.
+        // If fish size is 60px, that's 20%.
+        // So if hook is within the 20% box centered at fish.
+        
+        let targetWidthPercent = (this.currentFish.size / 300) * 100;
+        
+        if (diff < targetWidthPercent / 2 + 2) { // +2 grace
+            // Success
+            this.successCatch();
+        } else {
+            // Fail
+            this.failCatch();
+        }
+    }
+
+    successCatch() {
+        this.minigameEl.style.display = 'none';
+        this.state = 'REELING';
+        
+        // Update Score
+        this.score += this.currentFish.score;
+        this.updateUI();
+        
+        // Effects
+        this.showFloatingText(`+${this.currentFish.score}`, this.canvas.width/2, this.canvas.height/2);
+        
+        // Legendary Effect
+        if (this.currentFish === CONFIG.fishTypes.legendary) {
+            this.container.classList.add('legendary-effect');
+            setTimeout(() => this.container.classList.remove('legendary-effect'), 2000);
+        }
+
+        setTimeout(() => {
+            this.state = 'IDLE';
+            this.rodAngle = -Math.PI / 4;
+        }, 1000); // Animation duration
+    }
+
+    failCatch() {
+        this.minigameEl.style.display = 'none';
+        this.state = 'IDLE';
+        this.showFloatingText(`跑掉了...`, this.canvas.width/2, this.canvas.height/2, '#EEE');
+        this.rodAngle = -Math.PI / 4;
+    }
+
+    showFloatingText(text, x, y, color) {
+        let el = document.createElement('div');
+        el.className = 'floating-text';
+        el.innerText = text;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        if(color) el.style.color = color;
+        this.container.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+
+    updateUI() {
+        this.scoreEl.innerText = this.score;
+        this.timeEl.innerText = this.timeLeft;
+        let pct = Math.min((this.score / CONFIG.targetScore) * 100, 100);
+        this.progressEl.style.width = pct + '%';
+        
+        if (pct >= 100 && this.timeLeft > 0) {
+           this.progressEl.style.background = '#76FF03'; // Green for goal met
+        }
+    }
+
+    loop(timestamp) {
+        let dt = (timestamp - this.lastTime) / 1000;
+        this.lastTime = timestamp;
+
+        this.renderer.clear();
+        this.renderer.drawSky();
+        this.renderer.drawWater();
+        
+        // Rod Logic Update
+        let tipPos = this.renderer.drawPierAndFisherman(this.state, this.rodAngle);
+
+        if (this.state === 'CASTING') {
+            // Simple animation: Rod rotates down, line goes to target
+            this.rodAngle = Math.min(this.rodAngle + 2 * dt, 0); // Rotate down
+            this.hookPos.x += (this.targetHookPos.x - this.hookPos.x) * 5 * dt;
+            this.hookPos.y += (this.targetHookPos.y - this.hookPos.y) * 5 * dt;
+            
+            this.renderer.drawLineAndHook(tipPos.x, tipPos.y, this.hookPos.x, this.hookPos.y);
+
+            // Check if hook reached target approx
+            if (Math.abs(this.hookPos.y - this.targetHookPos.y) < 5) {
+                this.state = 'WAITING';
+                this.biteTimer = randomRange(0.5, 2.5); // Random wait
+            }
+
+        } else if (this.state === 'WAITING') {
+            // Line stays out, bobbing slightly
+            this.rodAngle = 0;
+            let bob = Math.sin(timestamp / 200) * 5;
+            this.renderer.drawLineAndHook(tipPos.x, tipPos.y, this.targetHookPos.x, this.targetHookPos.y + bob);
+            
+            this.biteTimer -= dt;
+            if (this.biteTimer <= 0) {
+                this.state = 'BITE';
+                this.biteTimer = 1.0; // Time to react (though mechanic is click anywhere, we jump to minigame)
+                
+                // For this casual game, auto-enter minigame after short delay or instantly
+                setTimeout(() => this.startMiniGame(), 500); 
+            }
+
+        } else if (this.state === 'BITE') {
+            // Show Exclamation!
+            let bob = Math.sin(timestamp / 50) * 5; // Furious bobbing
+            this.renderer.drawLineAndHook(tipPos.x, tipPos.y, this.targetHookPos.x, this.targetHookPos.y + bob);
+            this.renderer.drawExclamation(this.targetHookPos.x, this.targetHookPos.y - 20);
+
+        } else if (this.state === 'FISHING') {
+            // Mini-game Logic
+            this.renderer.drawLineAndHook(tipPos.x, tipPos.y, this.targetHookPos.x, this.targetHookPos.y); // Line taut
+            
+            // 1. Move Fish (Target)
+            this.miniGameData.time += dt;
+            // Fish moves in Sine wave based on its speed
+            // Map sin(-1 to 1) to (10 to 90) % to keep inside
+            let fishSpeed = this.currentFish.speed * 50; 
+            let fishSin = Math.sin(this.miniGameData.time * fishSpeed);
+            
+            // Add randomness for legendary
+            if (this.currentFish === CONFIG.fishTypes.legendary) {
+                 fishSin = Math.sin(this.miniGameData.time * fishSpeed) + Math.cos(this.miniGameData.time * fishSpeed * 2.5) * 0.5;
+                 // Normalize rough
+                 fishSin = Math.max(-1, Math.min(1, fishSin));
+            }
+
+            this.miniGameData.fishPos = 50 + (fishSin * 40); // 10% to 90% range
+            
+            // 2. Move Hook (Indicator)
+            // Auto oscillating hook for timing mechanic (Arcade style)
+            // Hook moves faster than fish usually, or different pattern
+            this.miniGameData.hookPos += this.miniGameData.hookVelocity * (60 * dt) * this.miniGameData.direction; // Base speed
+            
+            if (this.miniGameData.hookPos > 90) {
+                this.miniGameData.hookPos = 90;
+                this.miniGameData.direction = -1;
+            } else if (this.miniGameData.hookPos < 10) {
+                this.miniGameData.hookPos = 10;
+                this.miniGameData.direction = 1;
+            }
+
+            // Update DOM
+            this.minigameFish.style.left = this.miniGameData.fishPos + '%';
+            this.minigameHook.style.left = this.miniGameData.hookPos + '%';
+            this.minigameTarget.style.left = this.miniGameData.fishPos + '%';
+            
+            // Color feedback
+            let diff = Math.abs(this.miniGameData.fishPos - this.miniGameData.hookPos);
+            let targetWidthPercent = (this.currentFish.size / 300) * 100;
+            
+            if (diff < targetWidthPercent / 2 + 2) {
+                this.minigameHook.style.backgroundColor = "#76FF03"; // Green match
+                this.minigameTarget.style.backgroundColor = "rgba(118, 255, 3, 0.5)";
+            } else {
+                this.minigameHook.style.backgroundColor = "#F44336"; // Red no match
+                this.minigameTarget.style.backgroundColor = "rgba(76, 175, 80, 0.3)";
+            }
+
+        } else if (this.state === 'REELING') {
+            // Fish flies to bucket/ui
+            this.rodAngle = -Math.PI / 3;
+            // Draw fish flying
+            let progress = 1.0; // Instant for now or implement lerp
+            // Just show 'caught' state in idle transition
+        } else {
+            // Idle
+             this.hookPos = { x: tipPos.x, y: tipPos.y + 50 }; // Dangling
+             this.renderer.drawLineAndHook(tipPos.x, tipPos.y, this.hookPos.x, this.hookPos.y);
+        }
+
+        requestAnimationFrame((t) => this.loop(t));
+    }
+}
+
+// Initialize
+const game = new Game();
+
+</script>
+</body>
+</html>

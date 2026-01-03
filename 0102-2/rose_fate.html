@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>玫瑰命定 (Destined Rose)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel (用於解析 JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* 自定義動畫 */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .animate-slide-up { animation: slideUp 0.5s ease-out; }
+        .animate-zoom-in { animation: zoomIn 0.5s ease-out; }
+        .animate-bounce-slow { animation: bounce 3s infinite; }
+        .animate-spin-slow { animation: spin 4s linear infinite; }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+            50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        body {
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- 圖標組件 (使用 SVG) ---
+        const IconWrapper = ({ children, className, ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                {children}
+            </svg>
+        );
+
+        const Heart = (props) => <IconWrapper {...props}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></IconWrapper>;
+        const Skull = (props) => <IconWrapper {...props}><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></IconWrapper>;
+        const MapPin = (props) => <IconWrapper {...props}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></IconWrapper>;
+        const Music = (props) => <IconWrapper {...props}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></IconWrapper>;
+        const BookOpen = (props) => <IconWrapper {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></IconWrapper>;
+        const Activity = (props) => <IconWrapper {...props}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></IconWrapper>;
+        const Sparkles = (props) => <IconWrapper {...props}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></IconWrapper>;
+        const AlertCircle = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></IconWrapper>;
+        const RefreshCcw = (props) => <IconWrapper {...props}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></IconWrapper>;
+        const Dices = (props) => <IconWrapper {...props}><rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/></IconWrapper>;
+        const HeartCrack = (props) => <IconWrapper {...props}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="m12 13-1-1 2-2-3-3"/></IconWrapper>;
+        const Ban = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></IconWrapper>;
+
+        // --- 遊戲資料設定 ---
+
+        const CHARACTERS = {
+            ling: {
+                id: 'ling',
+                name: '凌子墨',
+                title: '高冷學生會長',
+                color: 'text-indigo-600',
+                bgGradient: 'from-slate-100 to-indigo-100',
+                location: '學生會辦公室',
+                description: '完美主義、理性、嘴硬心軟。沉穩氣場能讓毒素流動變緩。',
+                icon: <BookOpen className="w-6 h-6" />
+            },
+            han: {
+                id: 'han',
+                name: '韓律',
+                title: '叛逆樂團主唱',
+                color: 'text-rose-600',
+                bgGradient: 'from-gray-100 to-rose-100',
+                location: '屋頂花園',
+                description: '狂傲不羈，佔有慾強。歌聲能共振並驅散痛苦。',
+                icon: <Music className="w-6 h-6" />
+            },
+            jiang: {
+                id: 'jiang',
+                name: '姜以辰',
+                title: '陽光運動學弟',
+                color: 'text-amber-500',
+                bgGradient: 'from-orange-50 to-yellow-100',
+                location: '體育館',
+                description: '開朗熱情、直球告白。純淨生命力能快速恢復體力。',
+                icon: <Activity className="w-6 h-6" />
+            }
+        };
+
+        const SCRIPTS = {
+            ling: [
+                {
+                    text: "凌子墨坐在堆滿文件的辦公桌後，抬頭冷冷地看了你一眼。「妳遲到了。學生會不需要沒有時間觀念的人。」但他注意到妳蒼白的臉色。",
+                    options: [
+                        { text: "【示弱】虛弱地道歉並解釋身體不適", effect: { hp: 15, affinity: 10 }, response: "他皺了皺眉，起身為妳倒了一杯熱茶。「...下不為例。喝了它，這能緩解妳的臉色。」(他眼神軟化了)" },
+                        { text: "【理性】冷靜回報：「抱歉，但我已完成這週進度。」", effect: { hp: 5, affinity: 5 }, response: "他挑了挑眉，翻閱妳遞交的文件。「效率還行。坐下吧，別浪費時間。」(標準的反應)" },
+                        { text: "【逞強】強撐笑容說自己沒事", effect: { hp: -10, affinity: -5 }, response: "他冷哼一聲：「逞強只會增加別人的困擾。去做那邊的報表。」(妳感到一陣暈眩)" },
+                        { text: "【反抗】不悅地反駁他的態度", effect: { hp: -15, affinity: -15 }, response: "「如果妳是來吵架的，門在那邊。」辦公室氣溫瞬間降至冰點。(詛咒加劇)" }
+                    ]
+                },
+                {
+                    text: "辦公室只剩下你們兩人。凌子墨突然停下筆，「關於那個傳聞...妳的家族詛咒，是真的嗎？」他眼神變得銳利。",
+                    options: [
+                        { text: "【坦承】誠實告訴他，並尋求他的智慧", effect: { hp: 20, affinity: 15 }, response: "「原來如此...」他走到妳身邊，神色凝重，「只要是邏輯能解決的問題，我就不會讓妳死。」(好感大幅上升)" },
+                        { text: "【保留】點頭承認，但不願多說", effect: { hp: 5, affinity: 0 }, response: "「不想說就算了。」他重新拿起筆，但動作放輕了一些。「別在我的辦公室暈倒。」" },
+                        { text: "【迴避】轉移話題問公事", effect: { hp: -5, affinity: -5 }, response: "「不信任我嗎？隨便妳。」他坐回位子上，空氣變得尷尬。" },
+                        { text: "【說謊】笑著否認：「怎麼可能會有那種事？」", effect: { hp: -10, affinity: -20 }, response: "他眼神冷了下來。「我最討厭被當成傻子。出去。」(信任感破裂)" }
+                    ]
+                },
+                {
+                    text: "走廊上，凌子墨擋在妳面前，手中拿著一份體檢報告。「為什麼隱瞞病情？」他的聲音低沉，壓抑著怒氣。",
+                    options: [
+                        { text: "【心虛】「我不想被當成病人對待...」", effect: { hp: 10, affinity: 10 }, response: "他嘆了口氣，語氣放緩。「愚蠢。依賴強者是弱者的特權，懂嗎？」" },
+                        { text: "【反問】「這應該是個人隱私吧，會長？」", effect: { hp: -5, affinity: -5 }, response: "「在學生會，妳的隱私歸我管。」他霸道地將報告收進口袋。" },
+                        { text: "【求救】抓住他的衣袖：「救救我...」", effect: { hp: 20, affinity: 20 }, response: "他身體一僵，隨即反手握住妳的手。「...跟緊我，別亂跑。」(妳感受到他手心的溫度)" },
+                        { text: "【冷笑】「反正都要死了，有差嗎？」", effect: { hp: -20, affinity: -25 }, response: "「閉嘴。」他突然將妳按在牆上，眼神可怕。「不准在我面前說這種話。」" }
+                    ]
+                },
+                {
+                    text: "突如其來的午後雷陣雨困住了妳。正當妳發愁時，凌子墨撐著一把黑傘走來，停在妳面前。「沒帶傘？真是缺乏準備。」",
+                    options: [
+                        { text: "【調情】「我在等你呀，會長。」", effect: { hp: 15, affinity: 20 }, response: "他愣了一下，隨即轉過頭去掩飾嘴角的弧度。「...油嘴滑舌。進來吧，別淋濕了。」" },
+                        { text: "【禮貌】「可以讓我撐一下傘嗎？」", effect: { hp: 10, affinity: 10 }, response: "「靠近點，我不想肩膀濕掉。」他將傘向妳傾斜，兩人肩並肩走在雨中。" },
+                        { text: "【拒絕】「沒關係，我跑回去就好。」", effect: { hp: -10, affinity: -5 }, response: "「然後發燒請假？駁回。」他強行抓住妳的手腕，把妳拉到傘下。" },
+                        { text: "【抱怨】「這鬼天氣真討厭。」", effect: { hp: -5, affinity: -5 }, response: "「抱怨並不能讓雨停。」他冷冷地說，徑直往前走，妳只好尷尬地跟上。" }
+                    ]
+                },
+                {
+                    text: "圖書館角落，妳發現凌子墨正閉目養神，眼下的烏青顯示出他已多日未眠。妳不小心碰掉了一本書，發出聲響。",
+                    options: [
+                        { text: "【貼心】輕手輕腳地幫他披上外套", effect: { hp: 15, affinity: 15 }, response: "他睫毛顫動了一下，卻沒有睜開眼，只是呼吸變得平穩。妳在他身邊感到前所未有的安心。" },
+                        { text: "【道歉】小聲說：「對不起...」", effect: { hp: 5, affinity: 5 }, response: "他緩緩睜開眼，聲音沙啞。「...是妳啊。幾點了？」" },
+                        { text: "【叫醒】「會長，這裡不能睡覺。」", effect: { hp: -5, affinity: -15 }, response: "他猛地坐起，眼神充滿血絲。「...多管閒事。」氣氛變得極度糟糕。" },
+                        { text: "【嚇跑】驚慌失措地逃跑", effect: { hp: -5, affinity: 0 }, response: "身後傳來書本掉落的聲音，妳錯過了與他獨處的機會。" }
+                    ]
+                }
+            ],
+            han: [
+                {
+                    text: "屋頂的風很大，韓律正靠在欄杆上調著吉他弦。看到妳來，他嘴角勾起一抹玩世不恭的笑。「這不是那個快死的轉學生嗎？」",
+                    options: [
+                        { text: "【欣賞】靜靜地聽他彈琴，不回嘴", effect: { hp: 15, affinity: 10 }, response: "他有些意外妳的安靜，隨即彈奏起一首溫柔的曲子。「...算妳識貨。這首曲子能穩定心跳，免費送妳聽的。」" },
+                        { text: "【幽默】「聽完你的歌，說不定就活過來了。」", effect: { hp: 10, affinity: 15 }, response: "他大笑出聲：「哈！有意思。妳比看起來大膽多了。」(他對妳產生了興趣)" },
+                        { text: "【生氣】「你嘴巴一定要這麼壞嗎？」", effect: { hp: -10, affinity: -5 }, response: "「哈！還有力氣生氣？看來離死還早。」他撥弄了一下琴弦，刺耳的聲音讓妳頭痛。" },
+                        { text: "【無視】轉身就走", effect: { hp: -5, affinity: -10 }, response: "「喂！無視本大爺？」身後傳來他不爽的吉他雜音。" }
+                    ]
+                },
+                {
+                    text: "韓律把吉他撥片丟給妳。「拿著。這是本大爺的護身符。我看妳臉色白得像鬼一樣，別死在我的地盤上。」",
+                    options: [
+                        { text: "【感謝】雙手接過並珍視地收好", effect: { hp: 20, affinity: 15 }, response: "他別過頭去，耳根微紅。「囉嗦...只是怕麻煩而已，別想太多。」(撥片傳來溫暖的力量)" },
+                        { text: "【調侃】「這算是定情信物嗎？」", effect: { hp: 5, affinity: 10 }, response: "「咳！妳想得美！」雖然嘴上否認，但他嘴角的笑意卻藏不住。" },
+                        { text: "【猶豫】「這對你很重要吧？我不能收。」", effect: { hp: 0, affinity: -5 }, response: "「給妳就拿著！婆婆媽媽的煩死了。」他強硬地把撥片塞給妳。" },
+                        { text: "【拒絕】冷冷地拒絕施捨", effect: { hp: -15, affinity: -25 }, response: "「不識好歹。」他一把搶回撥片，眼裡的溫度消失了。「隨妳自生自滅吧。」" }
+                    ]
+                },
+                {
+                    text: "放學後的教室，韓律正睡在最後一排。妳正要離開，卻被他叫住。「喂，過來當枕頭。」他睡眼惺忪地拍了拍旁邊的位子。",
+                    options: [
+                        { text: "【順從】乖乖坐過去", effect: { hp: 15, affinity: 15 }, response: "他毫不客氣地靠在妳肩上，淡淡的菸草味混著沐浴乳香。「...別動，就這樣待著。」" },
+                        { text: "【拒絕】「我要回家了。」", effect: { hp: -5, affinity: -5 }, response: "「切，無情的女人。」他翻了個身，不再理妳。" },
+                        { text: "【惡作劇】在他耳邊大叫", effect: { hp: 5, affinity: 10 }, response: "「哇靠！」他嚇得跳起來，看著妳得逞的笑容，無奈地揉揉太陽穴。「妳這傢伙...膽子變肥了啊。」" },
+                        { text: "【關心】「在這睡會感冒的。」", effect: { hp: 10, affinity: 5 }, response: "「那妳把外套借我啊。」他理直氣壯地說，眼神卻帶著笑意。" }
+                    ]
+                },
+                {
+                    text: "韓律咬著筆桿，煩躁地將廢紙揉成一團丟在地上。「嘖，歌詞寫不出來...喂，妳覺得『愛』是什麼？」",
+                    options: [
+                        { text: "【共鳴】「像詛咒一樣，無法逃離。」", effect: { hp: 15, affinity: 20 }, response: "他眼神一亮，停止了轉筆。「...有點意思。妳這傢伙，偶爾也能說出不錯的話嘛。」" },
+                        { text: "【膚淺】「愛就是讓人心跳加速？」", effect: { hp: 5, affinity: 0 }, response: "「無聊。」他翻了個白眼，「那叫心律不整。」" },
+                        { text: "【認真】「是願意為對方犧牲。」", effect: { hp: 10, affinity: 5 }, response: "他沉默了片刻，若有所思地看著妳。「犧牲啊...沉重的話題。」" },
+                        { text: "【冷漠】「我怎麼知道，別問我。」", effect: { hp: -5, affinity: -10 }, response: "「切，問妳也是白問。」他戴上耳機，將世界隔絕在外。" }
+                    ]
+                },
+                {
+                    text: "一群狂熱的粉絲正在走廊搜尋韓律的身影。他突然把妳拉進狹窄的器材室，摀住妳的嘴。「噓...別出聲。」",
+                    options: [
+                        { text: "【凝視】安靜不動，直視他的雙眼", effect: { hp: 20, affinity: 20 }, response: "狹小的空間裡，兩人的呼吸交纏。他眼神閃爍，緩緩移開手，卻沒有拉開距離。(心跳聲震耳欲聾)" },
+                        { text: "【配合】點點頭表示理解", effect: { hp: 10, affinity: 10 }, response: "危機解除後，他鬆了口氣。「謝啦，幫大忙了。下次請妳喝飲料。」" },
+                        { text: "【掙扎】試圖掙脫他的手", effect: { hp: -5, affinity: -5 }, response: "「別亂動！」他壓低聲音警告，眉頭緊鎖，似乎對妳的不配合感到煩躁。" },
+                        { text: "【攻擊】咬他的手", effect: { hp: -10, affinity: -25 }, response: "「嘶——妳屬狗的嗎？」他吃痛放手，結果引來了外面的注意。「這下麻煩了...」" }
+                    ]
+                }
+            ],
+            jiang: [
+                {
+                    text: "體育館內傳來球鞋摩擦地板的聲音。姜以辰滿頭大汗地跑過來，像隻大型犬一樣。「學姐！妳來看我練習了嗎？」",
+                    options: [
+                        { text: "【體貼】遞給他毛巾和水，稱讚他帥氣", effect: { hp: 25, affinity: 15 }, response: "他接過毛巾，臉紅得像蘋果。「太好了！有學姐在，我覺得全身充滿力量！我會為妳贏下比賽的！」" },
+                        { text: "【鼓勵】微笑點頭：「加油，你看起來狀況不錯。」", effect: { hp: 10, affinity: 5 }, response: "他燦爛一笑：「嘿嘿，謝謝學姐！我會更努力的！」(純淨的笑容驅散了些許寒意)" },
+                        { text: "【冷淡】保持距離：「只是路過。」", effect: { hp: -5, affinity: -5 }, response: "「啊...這樣啊...」他像洩了氣的皮球，垂下頭去。妳感覺錯失了補充能量的機會。" },
+                        { text: "【嫌棄】掩鼻後退：「好多汗，離我遠點。」", effect: { hp: -10, affinity: -25 }, response: "他受傷地停下腳步，尷尬地退後。「抱、抱歉...弄髒學姐了...」(氣氛變得凝重)" }
+                    ]
+                },
+                {
+                    text: "練習結束後，姜以辰突然抓住妳的手腕。「學姐的手好冰...」他二話不說，用雙手緊緊包覆住妳的手。",
+                    options: [
+                        { text: "【依賴】任由他握著，輕聲道謝", effect: { hp: 30, affinity: 20 }, response: "源源不絕的熱度從掌心傳來。「我會把我的體溫分給妳！絕對不會讓妳消失的。」(詛咒被大幅壓制)" },
+                        { text: "【害羞】臉紅著試圖抽回手，但沒有用力", effect: { hp: 15, affinity: 10 }, response: "「啊，學姐臉紅了？」他壞心眼地握得更緊，「再一下下就好，讓妳暖和一點。」" },
+                        { text: "【抗拒】用力抽回手：「我不喜歡這樣。」", effect: { hp: -10, affinity: -5 }, response: "「抱歉...是我太唐突了。」他尷尬地抓抓頭，眼神黯淡下來。" },
+                        { text: "【責備】嚴厲斥責他的越界行為", effect: { hp: -15, affinity: -15 }, response: "「對不起！」他慌張地放開手，退後好幾步。妳感到體內的毒素因情緒波動而翻湧。" }
+                    ]
+                },
+                {
+                    text: "校園祭的準備時間，姜以辰抱著一大箱道具經過，看起來搖搖欲墜。「學、學姐！救命！」",
+                    options: [
+                        { text: "【幫忙】趕緊上前幫忙分擔", effect: { hp: 10, affinity: 15 }, response: "「呼...得救了！」他感激地看著妳，「學姐果然最好了！我們就像命中注定的搭檔一樣！」" },
+                        { text: "【指揮】叫旁邊的男同學幫忙", effect: { hp: 5, affinity: 5 }, response: "「雖然不是學姐親自幫忙...但還是謝啦！」他有些遺憾地笑了笑。" },
+                        { text: "【無視】假裝沒看到走掉", effect: { hp: 0, affinity: -5 }, response: "身後傳來道具散落一地的聲音，和他的嘆息聲。" },
+                        { text: "【嘲笑】「誰叫你一次拿那麼多。」", effect: { hp: -5, affinity: -10 }, response: "他低下頭，默默地自己撿起散落的道具，背影看起來很落寞。" }
+                    ]
+                },
+                {
+                    text: "姜以辰看著滿江紅的考卷，發出哀嚎。「完蛋了...這次再不及格就要被停練了！學姐救我！」",
+                    options: [
+                        { text: "【教導】「拿來吧，我幫你補習。」", effect: { hp: 10, affinity: 20 }, response: "他感動得眼淚汪汪，猛地抱住妳。「學姐是天使！我絕對會考一百分給妳看！」" },
+                        { text: "【建議】「去找老師求情比較快。」", effect: { hp: 5, affinity: 5 }, response: "「嗚嗚...老師好兇...」他像隻被遺棄的小狗般垂下耳朵。" },
+                        { text: "【嘲笑】忍不住笑出來：「你是笨蛋嗎？」", effect: { hp: 5, affinity: 10 }, response: "「學姐笑我！太過分了～」雖然嘴上抱怨，但他看著妳的笑容也跟著笑了。" },
+                        { text: "【打擊】「那就退社吧，反正你頭腦簡單。」", effect: { hp: -5, affinity: -20 }, response: "他愣住了，手中的考卷飄落。「...原來學姐是這樣看我的。」" }
+                    ]
+                },
+                {
+                    text: "販賣機前，妳想買的飲料剛好卡住了。姜以辰路過，輕鬆地用肩膀撞了一下機器，飲料應聲掉落。",
+                    options: [
+                        { text: "【分享】「謝謝，請你喝一半？」", effect: { hp: 20, affinity: 20 }, response: "他接過飲料喝了一大口，露出陽光的笑容。「間接接吻？嘿嘿，開玩笑的！謝啦學姐！」" },
+                        { text: "【感謝】「多謝了，大力士。」", effect: { hp: 10, affinity: 10 }, response: "「小事一樁！有任何粗活都可以找我喔！」他拍拍胸脯保證。" },
+                        { text: "【抱怨】「這機器真爛，心情都差了。」", effect: { hp: -5, affinity: 0 }, response: "「別生氣嘛，喝點甜的心情會變好喔。」他試圖安慰妳。" },
+                        { text: "【質疑】「你為什麼要用暴力？」", effect: { hp: -5, affinity: -10 }, response: "「呃...只是輕輕撞一下...」他無辜地撓撓頭，覺得自己好心沒好報。" }
+                    ]
+                }
+            ]
+        };
+
+        // --- 主遊戲組件 ---
+
+        function DestinedRoseGame() {
+            const [screen, setScreen] = useState('start'); // start, map, dialogue, ending, breakup
+            const [hp, setHp] = useState(100);
+            const [turn, setTurn] = useState(1);
+            const [maxTurns] = useState(8); 
+            const [affinities, setAffinities] = useState({ ling: 0, han: 0, jiang: 0 });
+            // 記錄與角色的關係狀態 (normal: 正常, broken: 決裂)
+            const [relationshipStatus, setRelationshipStatus] = useState({ ling: 'normal', han: 'normal', jiang: 'normal' });
+            
+            // 記錄已讀過的劇本索引
+            const [seenScenes, setSeenScenes] = useState({ ling: [], han: [], jiang: [] });
+            
+            const [currentChar, setCurrentChar] = useState(null);
+            const [currentSceneText, setCurrentSceneText] = useState('');
+            const [currentOptions, setCurrentOptions] = useState([]);
+            const [lastResponse, setLastResponse] = useState(null);
+            const [endingType, setEndingType] = useState(null); // true, bad, normal
+            const [endingMessage, setEndingMessage] = useState('');
+            const [breakupMessage, setBreakupMessage] = useState(''); // 決裂訊息
+
+            const curseOpacity = Math.max(0, (50 - hp) / 50); 
+            const curseBlur = Math.max(0, (40 - hp) / 10);
+
+            // 檢查狀態
+            useEffect(() => {
+                if (screen !== 'start' && screen !== 'ending' && screen !== 'breakup') {
+                if (hp <= 0) {
+                    triggerEnding('bad', "妳的視線逐漸模糊，心跳聲越來越微弱... 在18歲生日的前夕，詛咒奪走了妳的生命。");
+                }
+                }
+            }, [hp, screen]);
+
+            const startGame = () => {
+                setHp(80); 
+                setTurn(1);
+                setAffinities({ ling: 0, han: 0, jiang: 0 });
+                setRelationshipStatus({ ling: 'normal', han: 'normal', jiang: 'normal' });
+                setSeenScenes({ ling: [], han: [], jiang: [] });
+                setScreen('map');
+                setLastResponse(null);
+            };
+
+            const triggerRandomEncounter = () => {
+                const moveCost = 10;
+                setHp(prev => Math.max(0, prev - moveCost));
+
+                // 1. 找出所有「未決裂」且還有「未讀劇本」的角色
+                const charIds = Object.keys(CHARACTERS);
+                let availableChars = charIds.filter(id => {
+                const isNormal = relationshipStatus[id] === 'normal';
+                const totalScenes = SCRIPTS[id].length;
+                const readScenes = seenScenes[id].length;
+                return isNormal && readScenes < totalScenes;
+                });
+
+                // 特殊情況：如果所有未決裂角色的劇本都讀完了，重置他們的已讀紀錄 (除了已決裂的)
+                if (availableChars.length === 0) {
+                // 檢查是否還有任何未決裂的角色
+                const activeChars = charIds.filter(id => relationshipStatus[id] === 'normal');
+                
+                if (activeChars.length === 0) {
+                    // 全部決裂，觸發孤獨結局
+                    triggerEnding('bad', "妳在這個校園裡徹底孤立無援。沒有人願意再向妳伸出援手，詛咒最終吞噬了妳...");
+                    return;
+                }
+                
+                // 重置未決裂角色的劇本
+                setSeenScenes(prev => {
+                    const resetScenes = { ...prev };
+                    activeChars.forEach(id => resetScenes[id] = []);
+                    return resetScenes;
+                });
+                availableChars = activeChars;
+                }
+
+                const randomCharId = availableChars[Math.floor(Math.random() * availableChars.length)];
+                setCurrentChar(randomCharId);
+
+                const allSceneIndices = SCRIPTS[randomCharId].map((_, i) => i);
+                const readIndices = seenScenes[randomCharId];
+                let unreadIndices = allSceneIndices.filter(i => !readIndices.includes(i));
+                if (unreadIndices.length === 0) unreadIndices = allSceneIndices;
+
+                const randomSceneIndex = unreadIndices[Math.floor(Math.random() * unreadIndices.length)];
+
+                setSeenScenes(prev => ({
+                ...prev,
+                [randomCharId]: [...prev[randomCharId], randomSceneIndex]
+                }));
+
+                const scene = SCRIPTS[randomCharId][randomSceneIndex];
+                setCurrentSceneText(scene.text);
+                setCurrentOptions(scene.options);
+                setLastResponse(null);
+                setScreen('dialogue');
+            };
+
+            const handleChoice = (option) => {
+                if (!currentChar) return;
+
+                // 先計算新的好感度
+                const currentAffinity = affinities[currentChar];
+                const newAffinity = currentAffinity + option.effect.affinity;
+
+                // 更新數值
+                setHp(prev => Math.min(100, prev + option.effect.hp));
+                setAffinities(prev => ({
+                ...prev,
+                [currentChar]: newAffinity
+                }));
+                
+                // 檢查是否觸發決裂 (門檻設為 -20)
+                if (newAffinity <= -20) {
+                setRelationshipStatus(prev => ({ ...prev, [currentChar]: 'broken' }));
+                setBreakupMessage(`妳的言行徹底傷害了 ${CHARACTERS[currentChar].name}。他看著妳的眼神充滿了失望與冰冷，轉身離去，發誓不再與妳有任何瓜葛。`);
+                setScreen('breakup');
+                } else {
+                setLastResponse(option.response);
+                }
+            };
+
+            const nextTurn = () => {
+                if (turn >= maxTurns) {
+                const activeChars = Object.keys(affinities).filter(id => relationshipStatus[id] === 'normal');
+                
+                if (activeChars.length === 0) {
+                    triggerEnding('bad', "時間到了。妳沒有與任何人建立足夠的羈絆，在孤獨中迎來了18歲的終結。");
+                    return;
+                }
+
+                const bestMatch = activeChars.reduce((a, b) => affinities[a] > affinities[b] ? a : b);
+                const bestScore = affinities[bestMatch];
+
+                if (hp > 0 && bestScore >= 35) { 
+                    const char = CHARACTERS[bestMatch];
+                    triggerEnding('true', `在命運的指引下，妳與 ${char.name} 的靈魂產生了共鳴。在他身邊，詛咒的陰霾煙消雲散。18歲的清晨，你們緊緊相擁，迎來了新生的曙光。`);
+                } else {
+                    triggerEnding('normal', "雖然妳努力壓制了詛咒，但似乎還差了一點心動的感覺。隨著生日過去，妳的身體依然虛弱，但妳決定繼續尋找解藥...");
+                }
+                } else {
+                setTurn(prev => prev + 1);
+                setScreen('map');
+                }
+            };
+
+            const triggerEnding = (type, message) => {
+                setEndingType(type);
+                setEndingMessage(message);
+                setScreen('ending');
+            };
+
+            // --- UI 渲染輔助 ---
+
+            const ProgressBar = ({ value, max, color, icon }) => (
+                <div className="flex items-center gap-2 w-full">
+                <div className={`${color}`}>{icon}</div>
+                <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden border border-gray-300">
+                    <div 
+                    className={`h-full transition-all duration-500 ${color.replace('text-', 'bg-')}`} 
+                    style={{ width: `${(value / max) * 100}%` }}
+                    />
+                </div>
+                <span className="text-xs font-bold text-gray-600 w-8 text-right">{value}</span>
+                </div>
+            );
+
+            // --- 畫面 ---
+
+            if (screen === 'start') {
+                return (
+                <div className="w-full h-screen bg-rose-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+                    {/* 背景裝飾 */}
+                    <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                    <div className="absolute -top-20 -right-20 w-64 h-64 bg-rose-200 rounded-full blur-3xl opacity-50"></div>
+                    <div className="absolute top-40 -left-20 w-72 h-72 bg-indigo-200 rounded-full blur-3xl opacity-50"></div>
+                    
+                    <div className="z-10 text-center max-w-md w-full bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-xl border-2 border-rose-100">
+                    <div className="mb-6 flex justify-center text-rose-500">
+                        <Heart size={64} strokeWidth={1} fill="currentColor" className="animate-pulse" />
+                    </div>
+                    <h1 className="text-4xl font-serif text-gray-800 mb-2 font-bold tracking-widest">玫瑰命定</h1>
+                    <p className="text-rose-400 font-serif italic mb-8">Destined Rose</p>
+                    
+                    <div className="text-left text-gray-600 mb-8 space-y-4 text-sm bg-rose-50 p-4 rounded-lg">
+                        <p><strong>身分：</strong> 背負家族詛咒的轉學生</p>
+                        <p><strong>目標：</strong> 在18歲生日前（{maxTurns}回合內），聽從命運的指引與某人建立羈絆。</p>
+                        <p className="flex items-center gap-2 text-rose-600">
+                        <AlertCircle size={16} /> 
+                        <span>警告：體力歸零將導致死亡。</span>
+                        </p>
+                        <p className="flex items-center gap-2 text-gray-600">
+                        <HeartCrack size={16} /> 
+                        <span>注意：選錯對話可能導致關係破裂，攻略失敗。</span>
+                        </p>
+                    </div>
+
+                    <button 
+                        onClick={startGame}
+                        className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 px-6 rounded-full transition-all transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+                    >
+                        <Sparkles size={20} />
+                        開始故事
+                    </button>
+                    </div>
+                </div>
+                );
+            }
+
+            if (screen === 'breakup') {
+                return (
+                <div className="w-full h-screen bg-gray-900 flex flex-col items-center justify-center p-8 relative overflow-hidden text-white">
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/shatter.png')] opacity-20"></div>
+                    <div className="z-10 text-center max-w-lg animate-zoom-in">
+                        <div className="mx-auto mb-6 text-gray-400 flex justify-center"><HeartCrack size={100} /></div>
+                        <h2 className="text-3xl font-bold mb-6 text-red-500 tracking-widest">關係決裂</h2>
+                        <p className="text-lg leading-relaxed mb-8 text-gray-300">
+                            {breakupMessage}
+                        </p>
+                        <button 
+                            onClick={nextTurn}
+                            className="bg-gray-700 hover:bg-gray-600 text-white px-8 py-3 rounded-full transition-colors flex items-center gap-2 mx-auto"
+                        >
+                            帶著遺憾離開 <MapPin size={18} />
+                        </button>
+                    </div>
+                </div>
+                )
+            }
+
+            return (
+                <div className="w-full h-screen bg-slate-50 relative overflow-hidden font-sans text-gray-800">
+                {/* 詛咒特效層 */}
+                <div 
+                    className="absolute inset-0 z-50 pointer-events-none transition-all duration-1000 ease-in-out mix-blend-multiply bg-purple-900"
+                    style={{ opacity: curseOpacity * 0.6 }}
+                ></div>
+                <div 
+                    className="absolute inset-0 z-50 pointer-events-none backdrop-blur-[1px] transition-all duration-1000"
+                    style={{ backdropFilter: `blur(${curseBlur}px) grayscale(${curseOpacity * 100}%)` }}
+                ></div>
+                
+                {/* HUD 頂部狀態列 */}
+                <div className="absolute top-0 left-0 w-full z-40 bg-white/90 shadow-md p-3 flex flex-wrap gap-4 items-center justify-between border-b border-rose-100">
+                    <div className="flex items-center gap-4 flex-1 min-w-[200px]">
+                    <div className="flex flex-col w-full max-w-xs">
+                        <span className="text-xs text-gray-500 flex justify-between mb-1">
+                        <span>生命值 (詛咒壓制)</span>
+                        <span className={hp < 30 ? "text-red-600 animate-pulse font-bold" : ""}>
+                            {hp < 30 ? "危險!" : "穩定"}
+                        </span>
+                        </span>
+                        <ProgressBar value={hp} max={100} color={hp < 30 ? "text-red-500" : "text-rose-500"} icon={<Heart className="w-4 h-4" fill={hp < 30 ? "currentColor" : "none"} />} />
+                    </div>
+                    </div>
+                    
+                    <div className="flex gap-4 text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                    <span>距離生日: {maxTurns - turn + 1} 天</span>
+                    </div>
+                </div>
+
+                {/* 主內容區 */}
+                <div className="h-full pt-20 pb-6 px-4 flex items-center justify-center">
+                    
+                    {screen === 'map' && (
+                    <div className="w-full max-w-2xl flex flex-col items-center animate-fade-in">
+                        <div className="text-center mb-8">
+                            <h2 className="text-3xl font-serif text-gray-800 mb-2">命運的抉擇</h2>
+                            <p className="text-gray-500">在這所充滿秘密的校園裡，妳會遇見誰？</p>
+                        </div>
+
+                        <button
+                            onClick={triggerRandomEncounter}
+                            className="group relative w-64 h-64 md:w-80 md:h-80 bg-gradient-to-br from-rose-400 to-indigo-500 rounded-full flex flex-col items-center justify-center shadow-2xl hover:scale-105 transition-transform duration-500 border-8 border-white ring-4 ring-rose-100"
+                        >
+                            <div className="absolute inset-0 rounded-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 animate-spin-slow"></div>
+                            
+                            <div className="text-white mb-4 animate-bounce-slow"><Dices size={64} /></div>
+                            <span className="text-2xl font-bold text-white tracking-widest z-10">命運邂逅</span>
+                            <span className="text-white/80 text-sm mt-2 z-10">尋找解除詛咒的線索</span>
+                            
+                            {/* 光暈效果 */}
+                            <div className="absolute inset-0 rounded-full bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-500 blur-xl"></div>
+                        </button>
+
+                        <div className="mt-12 w-full grid grid-cols-3 gap-4">
+                            {Object.keys(CHARACTERS).map(id => (
+                                <div key={id} className={`text-center transition-all ${relationshipStatus[id] === 'broken' ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+                                    <div className={`text-xs font-bold mb-1 flex items-center justify-center gap-1 ${relationshipStatus[id] === 'broken' ? 'text-gray-500' : CHARACTERS[id].color}`}>
+                                        {relationshipStatus[id] === 'broken' && <Ban size={12}/>}
+                                        {CHARACTERS[id].name} {relationshipStatus[id] === 'broken' ? '(決裂)' : ''}
+                                    </div>
+                                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden relative">
+                                        {relationshipStatus[id] === 'broken' ? (
+                                        <div className="w-full h-full bg-gray-400 flex items-center justify-center"></div>
+                                        ) : (
+                                        <div 
+                                            className={`h-full ${CHARACTERS[id].color.replace('text-', 'bg-')}`} 
+                                            style={{ width: `${Math.max(0, Math.min(100, (affinities[id] / 50) * 100))}%` }}
+                                        ></div>
+                                        )}
+                                    </div>
+                                    <div className="mt-1 text-xs text-gray-400 font-mono">
+                                    {affinities[id]}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    )}
+
+                    {screen === 'dialogue' && currentChar && (
+                    <div className="w-full max-w-3xl bg-white/95 backdrop-blur rounded-2xl shadow-2xl overflow-hidden border border-rose-100 flex flex-col min-h-[500px] animate-slide-up relative">
+                        
+                        {/* 角色立繪區 */}
+                        <div className={`flex-1 bg-gradient-to-b ${CHARACTERS[currentChar].bgGradient} relative flex items-center justify-center p-8`}>
+                        <div className="text-center animate-bounce-slow">
+                            <div className={`w-32 h-32 mx-auto mb-4 rounded-full bg-white shadow-lg flex items-center justify-center ${CHARACTERS[currentChar].color}`}>
+                                {CHARACTERS[currentChar].icon}
+                            </div>
+                            <h2 className={`text-2xl font-bold ${CHARACTERS[currentChar].color}`}>{CHARACTERS[currentChar].name}</h2>
+                            <div className="inline-block bg-white/60 px-2 rounded text-xs mt-1 text-gray-500">{CHARACTERS[currentChar].location}</div>
+                        </div>
+                        </div>
+
+                        {/* 對話框 */}
+                        <div className="p-6 bg-white min-h-[240px] flex flex-col justify-between">
+                        
+                        {!lastResponse ? (
+                            <>
+                            <p className="text-lg text-gray-800 leading-relaxed mb-6 font-medium">
+                                {currentSceneText}
+                            </p>
+                            <div className="space-y-3">
+                                {currentOptions.map((opt, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => handleChoice(opt)}
+                                    className="w-full text-left p-4 rounded-xl border border-rose-200 hover:bg-rose-50 hover:border-rose-300 transition-colors flex items-center gap-3 group"
+                                >
+                                    <div className="w-6 h-6 rounded-full border-2 border-rose-300 flex items-center justify-center text-xs text-rose-500 group-hover:bg-rose-300 group-hover:text-white transition-colors flex-shrink-0">
+                                    {String.fromCharCode(65 + idx)}
+                                    </div>
+                                    <span className="text-gray-700 text-sm md:text-base">{opt.text}</span>
+                                </button>
+                                ))}
+                            </div>
+                            </>
+                        ) : (
+                            <div className="animate-fade-in">
+                            <p className="text-lg text-rose-900 leading-relaxed mb-8 italic border-l-4 border-rose-400 pl-4 py-2 bg-rose-50 rounded-r-lg">
+                                "{lastResponse}"
+                            </p>
+                            <div className="flex justify-end">
+                                <button 
+                                onClick={nextTurn}
+                                className="bg-gray-800 text-white px-8 py-3 rounded-full hover:bg-black transition-colors flex items-center gap-2"
+                                >
+                                {turn >= maxTurns ? "迎接命運" : "前往下一天"} <MapPin size={18} />
+                                </button>
+                            </div>
+                            </div>
+                        )}
+                        </div>
+                    </div>
+                    )}
+
+                    {screen === 'ending' && (
+                    <div className="text-center max-w-2xl bg-white p-10 rounded-3xl shadow-2xl border-4 border-double border-rose-200 animate-zoom-in">
+                        <div className="mb-6 flex justify-center">
+                        {endingType === 'true' && <div className="text-yellow-400 animate-spin-slow"><Sparkles size={80} /></div>}
+                        {endingType === 'bad' && <div className="text-gray-400"><Skull size={80} /></div>}
+                        {endingType === 'normal' && <div className="text-blue-400"><RefreshCcw size={80} /></div>}
+                        </div>
+                        
+                        <h2 className={`text-4xl font-serif font-bold mb-4 ${
+                        endingType === 'true' ? 'text-rose-600' : 
+                        endingType === 'bad' ? 'text-gray-800' : 'text-blue-600'
+                        }`}>
+                        {endingType === 'true' && "True End: 玫瑰綻放"}
+                        {endingType === 'bad' && "Bad End: 凋零"}
+                        {endingType === 'normal' && "Normal End: 未完的詛咒"}
+                        </h2>
+
+                        <p className="text-gray-600 leading-relaxed mb-10 text-lg">
+                        {endingMessage}
+                        </p>
+
+                        <button 
+                        onClick={startGame}
+                        className="bg-rose-500 text-white px-8 py-3 rounded-full hover:bg-rose-600 transition-colors font-bold shadow-lg"
+                        >
+                        重新開始輪迴
+                        </button>
+                    </div>
+                    )}
+                </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DestinedRoseGame />);
+    </script>
+</body>
+</html>

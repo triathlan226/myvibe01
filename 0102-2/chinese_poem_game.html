@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>西湖殘夢：古文煉獄考 (五選一·終極版)</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- 視覺風格設定 --- */
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #1a1a1a;
+            color: #d1d5db;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        /* 水墨背景紋理 (深色模式) */
+        .ink-bg {
+            background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+            background-color: #1f2937;
+        }
+
+        /* 霧氣動畫 */
+        @keyframes fogMove {
+            0% { transform: translateX(-10%); opacity: 0.1; }
+            50% { transform: translateX(10%); opacity: 0.3; }
+            100% { transform: translateX(-10%); opacity: 0.1; }
+        }
+        .fog-layer {
+            position: absolute;
+            top: 0; left: 0; width: 200%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(150,150,150,0.2), transparent);
+            animation: fogMove 40s infinite ease-in-out;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 震動特效 */
+        @keyframes shakeHard {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-3px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .shake-screen {
+            animation: shakeHard 0.5s;
+            animation-iteration-count: infinite;
+        }
+
+        /* 血紅濾鏡 */
+        .blood-filter {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle, transparent 30%, rgba(130, 0, 0, 0.8) 90%);
+            pointer-events: none;
+            z-index: 40;
+            mix-blend-mode: multiply;
+        }
+
+        .font-ink { font-family: 'Ma Shan Zheng', cursive; }
+        .animate-fade-in { animation: fadeIn 1s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* 答錯印章 */
+        @keyframes stamp {
+            0% { opacity: 0; transform: scale(3) rotate(-10deg); }
+            80% { opacity: 1; transform: scale(0.8) rotate(-10deg); }
+            100% { opacity: 1; transform: scale(1) rotate(-10deg); }
+        }
+        .stamp-anim { animation: stamp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        /* 選項按鈕樣式 */
+        .option-btn:hover {
+            background-color: #374151;
+            border-color: #9ca3af;
+        }
+        .option-btn:active {
+            transform: scale(0.98);
+        }
+        
+        /* 自定義滾動條 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
+    </style>
+</head>
+<body class="ink-bg h-screen w-screen relative overflow-hidden text-gray-200">
+    <div id="root" class="h-full w-full relative z-10"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // ==========================================
+        //         經史子集 核心資料庫 (擴充版)
+        // ==========================================
+        
+        // 1. 四書五經 (The Four Books and Five Classics)
+        const DB_CLASSICS = [
+            { book: "論語", chapter: "學而", content: "學而時習之，不亦說乎？有朋自遠方來，不亦樂乎？", speaker: "孔子" },
+            { book: "論語", chapter: "為政", content: "學而不思則罔，思而不學則殆。", speaker: "孔子" },
+            { book: "論語", chapter: "顏淵", content: "非禮勿視，非禮勿聽，非禮勿言，非禮勿動。", speaker: "孔子" },
+            { book: "論語", chapter: "里仁", content: "朝聞道，夕死可矣。", speaker: "孔子" },
+            { book: "論語", chapter: "述而", content: "三人行，必有我師焉。擇其善者而從之，其不善者而改之。", speaker: "孔子" },
+            { book: "論語", chapter: "泰伯", content: "士不可以不弘毅，任重而道遠。", speaker: "曾子" },
+            { book: "孟子", chapter: "公孫丑上", content: "昔者竊聞之：出於幽谷，遷于喬木者，未聞下喬木而入於幽谷者。", speaker: "孟子" },
+            { book: "孟子", chapter: "梁惠王上", content: "老吾老，以及人之老；幼吾幼，以及人之幼。", speaker: "孟子" },
+            { book: "孟子", chapter: "公孫丑上", content: "自反而縮，雖千萬人，吾往矣。", speaker: "孟子" },
+            { book: "孟子", chapter: "告子上", content: "魚，我所欲也；熊掌，亦我所欲也。二者不可得兼，舍魚而取熊掌者也。", speaker: "孟子" },
+            { book: "大學", chapter: "經一章", content: "大學之道，在明明德，在親民，在止於至善。", speaker: "曾子(傳)" },
+            { book: "大學", chapter: "經一章", content: "古之欲明明德於天下者，先治其國；欲治其國者，先齊其家。", speaker: "曾子(傳)" },
+            { book: "中庸", chapter: "第一章", content: "天命之謂性，率性之謂道，修道之謂教。", speaker: "子思(傳)" },
+            { book: "中庸", chapter: "第二十章", content: "博學之，審問之，慎思之，明辨之，篤行之。", speaker: "子思(傳)" },
+            { book: "易經", chapter: "乾卦", content: "天行健，君子以自強不息。", speaker: "文王/周公" },
+            { book: "易經", chapter: "坤卦", content: "地勢坤，君子以厚德載物。", speaker: "文王/周公" },
+            { book: "易經", chapter: "文言", content: "積善之家，必有餘慶；積不善之家，必有餘殃。", speaker: "孔子(傳)" },
+            { book: "詩經", chapter: "周南", content: "關關雎鳩，在河之洲。窈窕淑女，君子好逑。", speaker: "佚名" },
+            { book: "詩經", chapter: "秦風", content: "蒹葭蒼蒼，白露為霜。所謂伊人，在水一方。", speaker: "佚名" },
+            { book: "詩經", chapter: "小雅", content: "昔我往矣，楊柳依依。今我來思，雨雪霏霏。", speaker: "佚名" },
+            { book: "禮記", chapter: "禮運", content: "大道之行也，天下為公。", speaker: "孔子" },
+            { book: "禮記", chapter: "學記", content: "玉不琢，不成器；人不學，不知道。", speaker: "佚名" },
+            { book: "尚書", chapter: "大禹謨", content: "滿招損，謙受益。", speaker: "大禹" },
+            { book: "左傳", chapter: "曹劌論戰", content: "一鼓作氣，再而衰，三而竭。", speaker: "曹劌" },
+            { book: "左傳", chapter: "僖公五年", content: "輔車相依，脣亡齒寒。", speaker: "宮之奇" }
+        ];
+
+        // 2. 諸子百家 (Philosophers)
+        const DB_PHILOSOPHY = [
+            { book: "道德經", author: "老子", content: "道可道，非常道；名可名，非常名。" },
+            { book: "道德經", author: "老子", content: "上善若水。水善利萬物而不爭，處眾人之所惡，故幾於道。" },
+            { book: "道德經", author: "老子", content: "治大國，若烹小鮮。" },
+            { book: "莊子", author: "莊子", content: "北冥有魚，其名為鯤。鯤之大，不知其幾千里也。", chapter: "逍遙遊" },
+            { book: "莊子", author: "莊子", content: "吾生也有涯，而知也無涯。以有涯隨無涯，殆已！", chapter: "養生主" },
+            { book: "莊子", author: "莊子", content: "子非魚，安知魚之樂？", chapter: "秋水" },
+            { book: "莊子", author: "莊子", content: "相濡以沫，不如相忘於江湖。", chapter: "大宗師" },
+            { book: "墨子", author: "墨子", content: "視人之國，若視其國；視人之家，若視其家；視人之身，若視其身。", chapter: "兼愛" },
+            { book: "韓非子", author: "韓非", content: "儒以文亂法，俠以武犯禁。", chapter: "五蠹" },
+            { book: "孫子兵法", author: "孫武", content: "兵者，國之大事，死生之地，存亡之道，不可不察也。", chapter: "始計" },
+            { book: "孫子兵法", author: "孫武", content: "知彼知己，百戰不殆。", chapter: "謀攻" },
+            { book: "荀子", author: "荀子", content: "青，取之於藍，而青於藍；冰，水為之，而寒於水。", chapter: "勸學" },
+            { book: "荀子", author: "荀子", content: "鍥而舍之，朽木不折；鍥而不舍，金石可鏤。", chapter: "勸學" },
+            { book: "公孫龍子", author: "公孫龍", content: "白馬非馬。", chapter: "白馬論" }
+        ];
+
+        // 3. 史書與古文觀止 (History & Prose)
+        const DB_PROSE = [
+            { title: "史記", author: "司馬遷", content: "人固有一死，或重于泰山，或輕于鴻毛。", note: "報任少卿書" },
+            { title: "史記", author: "司馬遷", content: "燕雀安知鴻鵠之志哉！", note: "陳涉世家" },
+            { title: "史記", author: "司馬遷", content: "項莊舞劍，意在沛公。", note: "項羽本紀" },
+            { title: "史記", author: "司馬遷", content: "桃李不言，下自成蹊。", note: "李將軍列傳" },
+            { title: "過秦論", author: "賈誼", content: "一夫作難而七廟隳，身死人手，為天下笑者，何也？仁義不施而攻守之勢異也。" },
+            { title: "出師表", author: "諸葛亮", content: "親賢臣，遠小人，此先漢所以興隆也；親小人，遠賢臣，此後漢所以傾頹也。" },
+            { title: "陳情表", author: "李密", content: "煢煢獨立，形影相吊。", note: "形容孤獨" },
+            { title: "蘭亭集序", author: "王羲之", content: "群賢畢至，少長咸集。此地有崇山峻嶺，茂林修竹。", note: "東晉" },
+            { title: "歸去來辭", author: "陶淵明", content: "悟已往之不諫，知來者之可追。", note: "辭官" },
+            { title: "滕王閣序", author: "王勃", content: "老當益壯，寧移白首之心？窮且益堅，不墜青雲之志。" },
+            { title: "阿房宮賦", author: "杜牧", content: "滅六國者六國也，非秦也；族秦者秦也，非天下也。" },
+            { title: "醉翁亭記", author: "歐陽修", content: "野芳發而幽香，佳木秀而繁陰。", note: "寫景" },
+            { title: "赤壁賦", author: "蘇軾", content: "寄蜉蝣於天地，渺滄海之一粟。哀吾生之須臾，羨長江之無窮。" },
+            { title: "師說", author: "韓愈", content: "師者，所以傳道、受業、解惑也。" },
+            { title: "岳陽樓記", author: "范仲淹", content: "先天下之憂而憂，後天下之樂而樂。" }
+        ];
+
+        // 4. 詩詞補完 (Poetry - Hard Mode)
+        const DB_POETRY = [
+            { a: "屈原", t: "離騷", c: "路漫漫其修遠兮，吾將上下而求索。" },
+            { a: "屈原", t: "離騷", c: "亦余心之所善兮，雖九死其猶未悔。" },
+            { a: "曹操", t: "短歌行", c: "月明星稀，烏鵲南飛。繞樹三匝，何枝可依？" },
+            { a: "曹植", t: "七步詩", c: "本是同根生，相煎何太急？" },
+            { a: "陶淵明", t: "歸園田居", c: "羈鳥戀舊林，池魚思故淵。" },
+            { a: "李白", t: "蜀道難", c: "蜀道之難，難於上青天！" },
+            { a: "李白", t: "行路難", c: "長風破浪會有時，直掛雲帆濟滄海。" },
+            { a: "杜甫", t: "茅屋為秋風所破歌", c: "安得廣廈千萬間，大庇天下寒士俱歡顏！" },
+            { a: "白居易", t: "琵琶行", c: "同是天涯淪落人，相逢何必曾相識。" },
+            { a: "李商隱", t: "夜雨寄北", c: "何當共剪西窗燭，卻話巴山夜雨時。" },
+            { a: "李煜", t: "浪淘沙", c: "流水落花春去也，天上人間。" },
+            { a: "范仲淹", t: "蘇幕遮", c: "酒入愁腸，化作相思淚。" },
+            { a: "王安石", t: "登飛來峰", c: "不畏浮雲遮望眼，自緣身在最高層。" },
+            { a: "文天祥", t: "過零丁洋", c: "人生自古誰無死？留取丹心照汗青。" },
+            { a: "龔自珍", t: "己亥雜詩", c: "我勸天公重抖擻，不拘一格降人才。" },
+            { a: "辛棄疾", t: "破陣子", c: "了卻君王天下事，贏得生前身後名。" },
+            { a: "蘇軾", t: "江城子", c: "十年生死兩茫茫，不思量，自難忘。" }
+        ];
+
+        // 5. 官位與懲罰 (Ranks & Punishments)
+        const RANKS = ["童生", "秀才", "舉人", "貢士", "進士", "編修", "侍講", "學士", "大學士", "太師", "聖人"];
+        const PUNISHMENTS = [
+            { threshold: 15, name: "掌嘴", desc: "口出狂言，掌嘴二十", color: "text-red-600" },
+            { threshold: 23, name: "夾棍", desc: "十指連心，痛徹心扉", color: "text-red-700" },
+            { threshold: 30, name: "黥面", desc: "墨刑毀容，永世蒙羞", color: "text-red-800" },
+            { threshold: 34, name: "宮刑", desc: "斷絕子孫，奇恥大辱", color: "text-red-900" },
+            { threshold: 40, name: "凌遲", desc: "千刀萬剮，求死不能", color: "text-red-950" }
+        ];
+
+        // Helper: 洗牌
+        const shuffle = (array) => {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex != 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        };
+
+        // Helper: 隨機取樣 (取 4 個不重複的)
+        const sample = (arr, count) => shuffle([...arr]).slice(0, count);
+
+        // ==========================================
+        //         超級生成器 (The Generator)
+        // ==========================================
+        const generateQuestions = () => {
+            let generated = [];
+            let idCounter = 1000;
+
+            // 1. 四書五經生成邏輯
+            DB_CLASSICS.forEach(item => {
+                // A. 填空題 (湊 5 選項)
+                if (item.content.length > 6) {
+                    const parts = item.content.split(/[，。；？]/).filter(p => p.length > 2);
+                    if (parts.length > 0) {
+                        const targetPart = parts[Math.floor(Math.random() * parts.length)];
+                        const len = targetPart.length;
+                        const start = Math.floor(Math.random() * (len - 2));
+                        const blankWord = targetPart.substr(start, 2);
+                        const questionStr = item.content.replace(blankWord, "＿＿");
+                        
+                        // 產生 4 個干擾項 (從其他經典中找雙字)
+                        const distractors = sample(
+                            DB_CLASSICS.filter(c => c !== item).map(c => c.content.substr(0,2)), 4
+                        );
+                        
+                        generated.push({
+                            id: idCounter++,
+                            type: "fill",
+                            content: `《${item.book}》：「${questionStr}」`,
+                            options: shuffle([...distractors, blankWord]),
+                            answer: blankWord,
+                            hint: `出自《${item.book}·${item.chapter}》。`
+                        });
+                    }
+                }
+
+                // B. 出處題 (5 選項：1 正確 + 4 干擾)
+                const otherBooks = [...new Set(DB_CLASSICS.map(i => i.book).filter(b => b !== item.book))];
+                // 確保干擾項夠多，如果不夠就重複取
+                let distractors = [];
+                if (otherBooks.length >= 4) {
+                    distractors = sample(otherBooks, 4);
+                } else {
+                    // 萬一書名不夠4本(極少情況)，混合哲學書名
+                    const extra = DB_PHILOSOPHY.map(p => p.book);
+                    distractors = sample([...otherBooks, ...extra], 4);
+                }
+
+                generated.push({
+                    id: idCounter++,
+                    type: "choice",
+                    content: `「${item.content.split(/[，。]/)[0]}...」出自哪部典籍？`,
+                    options: shuffle([...distractors, item.book]),
+                    answer: item.book,
+                    hint: `核心思想：${item.speaker}相關。`
+                });
+            });
+
+            // 2. 諸子百家生成邏輯
+            DB_PHILOSOPHY.forEach(item => {
+                // A. 思想配對 (誰說的) - 5 選項
+                const otherPhilosophers = [...new Set(DB_PHILOSOPHY.map(p => p.author).filter(a => a !== item.author))];
+                const distractors = sample(otherPhilosophers, 4);
+
+                generated.push({
+                    id: idCounter++,
+                    type: "choice",
+                    content: `「${item.content.substring(0, 15)}...」體現了哪家思想？`,
+                    options: shuffle([...distractors, item.author]),
+                    answer: item.author,
+                    hint: `出自《${item.book}》。`
+                });
+            });
+
+            // 3. 古文觀止生成邏輯
+            DB_PROSE.forEach(item => {
+                // A. 下一句 - 5 選項
+                const parts = item.content.split(/[，。；]/);
+                if (parts.length >= 2) {
+                    const qPart = parts[0];
+                    const aPart = parts[1];
+                    const distractors = sample(DB_PROSE.filter(p => p !== item).map(p => p.content.split(/[，。]/)[1] || "不知所云"), 4);
+                    
+                    generated.push({
+                        id: idCounter++,
+                        type: "choice",
+                        content: `《${item.title}》：「${qPart}」下一句是？`,
+                        options: shuffle([...distractors, aPart]),
+                        answer: aPart,
+                        hint: `作者：${item.author}。`
+                    });
+                }
+            });
+
+            // 4. 詩詞生成 - 5 選項
+            DB_POETRY.forEach(item => {
+                const otherPoets = sample(DB_POETRY.map(p => p.a).filter(a => a !== item.a), 4);
+                generated.push({
+                    id: idCounter++,
+                    type: "choice",
+                    content: `「${item.c}」作者為何人？`,
+                    options: shuffle([...otherPoets, item.a]),
+                    answer: item.a,
+                    hint: `作品《${item.t}》。`
+                });
+            });
+
+            return shuffle(generated);
+        };
+
+        // --- 全螢幕工具 ---
+        const toggleFullScreen = () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        };
+
+        // --- 組件 ---
+
+        const StartScreen = ({ onStart }) => (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-fade-in z-20 absolute inset-0 bg-black bg-opacity-60">
+                <h1 className="text-5xl md:text-7xl mb-4 font-ink text-red-100 drop-shadow-[0_5px_5px_rgba(200,0,0,0.5)] tracking-widest">
+                    西湖殘夢
+                </h1>
+                <h2 className="text-2xl md:text-4xl mb-6 font-serif text-gray-400 tracking-[0.2em] border-b border-gray-600 pb-4">
+                    經史子集・五選一煉獄
+                </h2>
+                
+                <div className="max-w-xl text-lg text-gray-300 mb-12 font-serif leading-loose text-left bg-gray-900 bg-opacity-70 p-6 rounded border border-gray-700">
+                    <p className="mb-2">「學而不思則罔，思而不學則殆。」</p>
+                    <p className="mb-2">此番輪迴，難度倍增。</p>
+                    <p className="mb-2">四書五經、諸子百家，每題五選一。</p>
+                    <p className="mt-4 text-red-500 font-bold text-center">凡夫俗子，慎入此門。</p>
+                </div>
+
+                <button 
+                    onClick={() => { toggleFullScreen(); onStart(); }}
+                    className="px-16 py-4 border border-gray-500 bg-gray-800 text-gray-200 text-2xl font-ink hover:bg-red-900 hover:text-white hover:border-red-700 transition-all duration-500 transform hover:scale-105 shadow-2xl"
+                >
+                    死生契闊・與子成說
+                </button>
+            </div>
+        );
+
+        const PunishmentModal = ({ punishment, onConfirm }) => {
+            if (!punishment) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-95 shake-screen">
+                    <div className="blood-filter"></div>
+                    <div className="text-center relative z-50 p-6 border-4 border-red-900 bg-black max-w-full m-4">
+                        <h2 className="text-8xl md:text-9xl text-red-600 font-ink stamp-anim mb-4 inline-block p-4 rotate-[-12deg]">
+                            {punishment.name}
+                        </h2>
+                        <p className="text-2xl md:text-3xl text-red-500 mt-8 font-serif tracking-widest animate-pulse">
+                            {punishment.desc}
+                        </p>
+                        <button 
+                            onClick={onConfirm}
+                            className="mt-12 px-10 py-3 border border-red-800 text-red-500 hover:bg-red-900 hover:text-white transition-colors uppercase tracking-widest"
+                        >
+                            領 罰
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const GameScreen = ({ currentQuestion, rank, hp, timer, qIndex, totalQ, onAnswer }) => {
+            return (
+                <div className="flex flex-col h-full w-full max-w-4xl mx-auto p-2 md:p-6 relative z-10 justify-between">
+                    {/* HUD */}
+                    <div className="flex justify-between items-end border-b border-gray-600 pb-2 bg-gray-900 bg-opacity-40 p-3 rounded-t">
+                        <div className="flex flex-col">
+                            <span className="text-xs md:text-sm text-gray-400">當前官位</span>
+                            <span className="text-2xl md:text-3xl font-ink text-yellow-100">{rank}</span>
+                        </div>
+                        <div className="flex flex-col w-1/3 md:w-1/2 mx-2">
+                            <div className="flex justify-between text-xs md:text-sm mb-1 text-gray-400">
+                                <span>心神 (HP)</span>
+                                <span>{Math.floor(hp)}/100</span>
+                            </div>
+                            <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden border border-gray-600">
+                                <div 
+                                    className={`h-full transition-all duration-500 ${hp < 30 ? 'bg-red-700' : 'bg-teal-700'}`}
+                                    style={{ width: `${Math.max(0, hp)}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-xs md:text-sm text-gray-400">劫數</span>
+                            <span className="text-xl md:text-2xl font-serif text-gray-200">{qIndex + 1} / {totalQ}</span>
+                        </div>
+                    </div>
+
+                    {/* Question Card */}
+                    <div className="flex-grow flex flex-col justify-center items-center py-2 relative w-full">
+                        <div className="w-full bg-gray-800 bg-opacity-90 shadow-[0_0_30px_rgba(0,0,0,0.5)] rounded backdrop-blur-md border border-gray-600 p-4 md:p-8 flex flex-col max-h-[75vh] overflow-y-auto relative">
+                            {/* 裝飾線 */}
+                            <div className="absolute top-2 right-2 w-8 h-8 md:w-16 md:h-16 border-t-2 border-r-2 border-gray-600 opacity-50"></div>
+                            <div className="absolute bottom-2 left-2 w-8 h-8 md:w-16 md:h-16 border-b-2 border-l-2 border-gray-600 opacity-50"></div>
+
+                            <div className="mb-4 flex justify-between items-start">
+                                <span className="inline-block px-2 py-1 bg-gray-900 text-gray-400 border border-gray-600 text-xs tracking-widest">
+                                    {currentQuestion.type === 'choice' ? '【辨析】' : currentQuestion.type === 'fill' ? '【補闕】' : '【審問】'}
+                                </span>
+                            </div>
+                            
+                            <h3 className="text-lg md:text-2xl font-serif leading-loose font-bold text-gray-100 mb-6 text-center tracking-wide">
+                                {currentQuestion.content}
+                            </h3>
+
+                            {/* 五個選項：改為單欄垂直排列以適應長選項 */}
+                            <div className="flex flex-col gap-3 w-full">
+                                {currentQuestion.options.map((opt, idx) => (
+                                    <button 
+                                        key={idx}
+                                        onClick={() => onAnswer(opt)}
+                                        className="option-btn text-left px-4 py-3 text-sm md:text-lg border border-gray-600 bg-gray-900 bg-opacity-50 text-gray-300 transition-all duration-200 flex items-center group relative overflow-hidden"
+                                    >
+                                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-gray-600 group-hover:bg-red-800 transition-colors"></span>
+                                        <span className="flex-shrink-0 w-8 h-8 rounded-full border border-gray-500 flex items-center justify-center mr-4 text-sm font-serif group-hover:bg-gray-700">
+                                            {['甲','乙','丙','丁','戊'][idx]}
+                                        </span>
+                                        <span className="leading-relaxed">{opt}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Timer */}
+                    <div className="mt-2 w-full">
+                         <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <span>一炷香時間</span>
+                            <span>{timer}s</span>
+                        </div>
+                        <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-red-900 transition-all duration-1000 linear"
+                                style={{ width: `${(timer / 60) * 100}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ResultScreen = ({ hp, rank, wrongCount, onRestart }) => {
+            const isDead = hp <= 0;
+            return (
+                <div className="flex flex-col items-center justify-center h-full text-center p-8 z-20 animate-fade-in relative bg-black bg-opacity-80">
+                    {isDead && <div className="blood-filter"></div>}
+                    
+                    <h1 className={`text-6xl md:text-8xl mb-6 font-ink ${isDead ? 'text-red-700' : 'text-yellow-600'}`}>
+                        {isDead ? "道消魔長" : "聖人再世"}
+                    </h1>
+                    
+                    <p className="text-gray-400 text-xl mb-8 font-serif">
+                        {isDead ? "學海無涯，回頭是岸。" : "為往聖繼絕學，為萬世開太平。"}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-6 text-left max-w-lg w-full bg-gray-900 border border-gray-700 p-8 rounded mb-10">
+                        <div>
+                            <p className="text-xs text-gray-500">最終官位</p>
+                            <p className="text-2xl font-bold text-yellow-100">{rank}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500">剩餘心神</p>
+                            <p className={`text-2xl font-bold ${hp > 50 ? 'text-teal-500' : 'text-red-500'}`}>{Math.max(0, hp)}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500">錯題數</p>
+                            <p className="text-2xl font-bold text-red-500">{wrongCount}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500">極刑</p>
+                            <p className="text-xl font-ink text-red-700">{
+                                wrongCount >= 40 ? "凌遲" :
+                                wrongCount >= 34 ? "宮刑" : 
+                                wrongCount >= 30 ? "黥面" : 
+                                wrongCount >= 23 ? "夾棍" : 
+                                wrongCount >= 15 ? "掌嘴" : "無"
+                            }</p>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={onRestart}
+                        className="px-12 py-4 border border-gray-500 text-gray-300 hover:bg-gray-800 hover:text-white transition-all text-xl font-serif rounded shadow-lg z-50"
+                    >
+                        重入輪迴
+                    </button>
+                </div>
+            );
+        };
+
+        // --- Main App ---
+        const App = () => {
+            const TOTAL_QUESTIONS = 45;
+            const HP_PENALTY = 5; 
+            const QUESTION_TIME = 45; 
+
+            const [gameState, setGameState] = useState('start'); 
+            const [questions, setQuestions] = useState([]);
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [hp, setHp] = useState(100);
+            const [wrongCount, setWrongCount] = useState(0);
+            const [timer, setTimer] = useState(QUESTION_TIME);
+            const [rank, setRank] = useState(RANKS[0]);
+            const [currentPunishment, setCurrentPunishment] = useState(null);
+            
+            const createQuestionPool = () => {
+                const proceduralQuestions = generateQuestions();
+                return proceduralQuestions.slice(0, TOTAL_QUESTIONS);
+            };
+
+            const startGame = () => {
+                setQuestions(createQuestionPool());
+                setHp(100);
+                setWrongCount(0);
+                setCurrentIndex(0);
+                setRank(RANKS[0]);
+                setGameState('playing');
+                setTimer(QUESTION_TIME);
+                setCurrentPunishment(null);
+            };
+
+            useEffect(() => {
+                if (gameState !== 'playing') return;
+                const progress = currentIndex / TOTAL_QUESTIONS;
+                const rankIndex = Math.floor(progress * RANKS.length);
+                if (RANKS[rankIndex]) setRank(RANKS[rankIndex]);
+            }, [currentIndex, gameState]);
+
+            useEffect(() => {
+                if (gameState !== 'playing') return;
+                const interval = setInterval(() => {
+                    setTimer(prev => {
+                        if (prev <= 1) {
+                            handleAnswer(null, true);
+                            return QUESTION_TIME;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+                return () => clearInterval(interval);
+            }, [gameState, currentIndex]); 
+
+            const triggerPunishment = (newWrongCount) => {
+                const punish = PUNISHMENTS.slice().reverse().find(p => newWrongCount === p.threshold);
+                if (punish) {
+                    setCurrentPunishment(punish);
+                    setGameState('paused');
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
+                    return true;
+                }
+                return false;
+            };
+
+            const handleAnswer = (answer, isTimeout = false) => {
+                const currentQ = questions[currentIndex];
+                const isCorrect = !isTimeout && answer === currentQ.answer;
+
+                if (!isCorrect) {
+                    const newHp = hp - HP_PENALTY;
+                    const newWrong = wrongCount + 1;
+                    setHp(newHp);
+                    setWrongCount(newWrong);
+
+                    if (navigator.vibrate) navigator.vibrate(300);
+
+                    if (newHp <= 0) {
+                        setGameState('gameover');
+                        return;
+                    }
+                    if (triggerPunishment(newWrong)) return;
+                }
+
+                nextQuestion();
+            };
+
+            const nextQuestion = () => {
+                if (currentIndex >= TOTAL_QUESTIONS - 1) {
+                    setGameState('victory');
+                } else {
+                    setCurrentIndex(prev => prev + 1);
+                    setTimer(QUESTION_TIME);
+                }
+            };
+
+            const resumeGame = () => {
+                setCurrentPunishment(null);
+                setGameState('playing');
+                nextQuestion(); 
+            };
+
+            return (
+                <div className="h-full w-full relative overflow-hidden flex flex-col">
+                    <button 
+                        onClick={toggleFullScreen}
+                        className="absolute top-4 right-4 z-50 p-2 bg-gray-900 border border-gray-600 text-gray-400 rounded hover:text-white transition-all text-xs opacity-50 hover:opacity-100"
+                    >
+                        ⛶ 全螢幕
+                    </button>
+
+                    <div className="fog-layer"></div>
+                    
+                    {gameState === 'start' && <StartScreen onStart={startGame} />}
+                    
+                    {gameState === 'playing' && questions.length > 0 && (
+                        <GameScreen 
+                            currentQuestion={questions[currentIndex]}
+                            rank={rank}
+                            hp={hp}
+                            timer={timer}
+                            qIndex={currentIndex}
+                            totalQ={TOTAL_QUESTIONS}
+                            onAnswer={handleAnswer}
+                        />
+                    )}
+
+                    {gameState === 'paused' && currentPunishment && (
+                        <PunishmentModal 
+                            punishment={currentPunishment} 
+                            onConfirm={resumeGame} 
+                        />
+                    )}
+
+                    {(gameState === 'gameover' || gameState === 'victory') && (
+                        <ResultScreen 
+                            hp={hp} 
+                            rank={rank}
+                            wrongCount={wrongCount} 
+                            onRestart={startGame} 
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

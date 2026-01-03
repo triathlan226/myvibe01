@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Street Ball 2D: Midnight Masterclass</title>
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff0055;
+            --neon-yellow: #ffdd00;
+            --bg-dark: #080810;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: white;
+            user-select: none;
+            touch-action: none;
+        }
+
+        /* 遊戲容器 */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000 100%);
+        }
+
+        canvas {
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            border-top: 2px solid #333;
+            border-bottom: 2px solid #333;
+        }
+
+        /* UI 層 */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* 計分板 */
+        .scoreboard {
+            display: flex;
+            justify-content: center;
+            gap: 150px;
+            text-transform: uppercase;
+            font-weight: 900;
+            font-style: italic;
+        }
+
+        .team-box {
+            text-align: center;
+            position: relative;
+        }
+
+        .team-label {
+            font-size: 14px;
+            letter-spacing: 3px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .score {
+            font-size: 80px;
+            line-height: 1;
+            text-shadow: 5px 5px 0px rgba(0,0,0,0.5);
+        }
+
+        #p1-score { color: var(--neon-cyan); text-shadow: 0 0 20px rgba(0, 243, 255, 0.4); }
+        #cpu-score { color: var(--neon-pink); text-shadow: 0 0 20px rgba(255, 0, 85, 0.4); }
+
+        /* 體力條 */
+        .bars {
+            width: 120px;
+            height: 6px;
+            background: #333;
+            margin: 10px auto;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar-fill { height: 100%; width: 100%; transition: width 0.1s linear; }
+        #p1-stamina { background: var(--neon-cyan); }
+        #cpu-stamina { background: var(--neon-pink); }
+
+        /* 中央訊息 */
+        #center-msg {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 10;
+        }
+        #center-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+
+        .msg-title {
+            font-size: 60px;
+            font-weight: 900;
+            color: var(--neon-yellow);
+            text-shadow: 0 0 30px var(--neon-yellow), 4px 4px 0 #000;
+            white-space: nowrap;
+        }
+        .msg-sub { font-size: 20px; color: #fff; letter-spacing: 2px; margin-top: 10px; }
+
+        /* 操作提示 */
+        #controls-hint {
+            text-align: center;
+            color: rgba(255,255,255,0.4);
+            font-size: 12px;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding-bottom: 20px;
+        }
+
+        .key {
+            display: inline-block;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            padding: 2px 6px;
+            margin: 0 3px;
+            font-family: monospace;
+            background: rgba(255,255,255,0.05);
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="scoreboard">
+            <div class="team-box">
+                <div class="team-label">PLAYER 1</div>
+                <div class="score" id="p1-score">00</div>
+                <div class="bars"><div class="bar-fill" id="p1-stamina"></div></div>
+            </div>
+            <div class="team-box">
+                <div class="team-label">CPU</div>
+                <div class="score" id="cpu-score">00</div>
+                <div class="bars"><div class="bar-fill" id="cpu-stamina"></div></div>
+            </div>
+        </div>
+
+        <div id="center-msg">
+            <div class="msg-title" id="msg-main">SLAM DUNK!</div>
+            <div class="msg-sub" id="msg-desc">+2 POINTS</div>
+        </div>
+
+        <div id="controls-hint">
+            <span style="color:var(--neon-cyan)">移動</span> <span class="key">←</span><span class="key">→</span> | 
+            <span style="color:var(--neon-cyan)">跳躍/火鍋</span> <span class="key">↑</span> | 
+            <span style="color:var(--neon-pink)">衝刺/抄截</span> 按住 <span class="key">Shift</span> | 
+            <span style="color:var(--neon-yellow)">投籃/灌籃</span> 長按 <span class="key">Space</span> 放開
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+/**
+ * STREET BALL 2D: MIDNIGHT MASTERCLASS ENGINE (v3.0)
+ * Update: Fixed Shot Meter, Mid-court Tip-off, Added Dunk Mechanics
+ */
+
+if (window.gameAnimationId) {
+    cancelAnimationFrame(window.gameAnimationId);
+}
+
+// ==========================================
+// 1. MATH & UTILS
+// ==========================================
+const M = {
+    clamp: (v, min, max) => Math.max(min, Math.min(v, max)),
+    dist: (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2),
+    rand: (min, max) => Math.random() * (max - min) + min,
+    // 簡單的圓形與矩形碰撞
+    circleRect: (cx, cy, radius, rx, ry, rw, rh) => {
+        let testX = cx;
+        let testY = cy;
+        if (cx < rx) testX = rx;
+        else if (cx > rx + rw) testX = rx + rw;
+        if (cy < ry) testY = ry;
+        else if (cy > ry + rh) testY = ry + rh;
+        let distX = cx - testX;
+        let distY = cy - testY;
+        return (distX*distX + distY*distY) <= (radius*radius);
+    }
+};
+
+// ==========================================
+// 2. CONFIG
+// ==========================================
+const CFG = {
+    w: 1200,
+    h: 700,
+    gravity: 0.7,
+    floorY: 600,
+    rimX: 1050,
+    rimY: 350,
+    rimRadius: 25,
+    backboardX: 1085,
+    perfectChargeMin: 0.65,
+    perfectChargeMax: 0.75,
+    colors: {
+        p1: '#00f3ff',
+        cpu: '#ff0055',
+        ball: '#ff7700',
+        rim: '#ff3300'
+    }
+};
+
+// ==========================================
+// 3. ENGINE CORE
+// ==========================================
+const Engine = {
+    canvas: document.getElementById('gameCanvas'),
+    ctx: document.getElementById('gameCanvas').getContext('2d'),
+    width: CFG.w,
+    height: CFG.h,
+    lastTime: 0,
+    entities: [],
+    particles: [],
+    keys: {},
+    prevKeys: {},
+    
+    init() {
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        window.addEventListener('keydown', e => this.keys[e.code] = true);
+        window.addEventListener('keyup', e => this.keys[e.code] = false);
+        window.gameAnimationId = requestAnimationFrame(t => this.loop(t));
+        Game.start();
+    },
+    
+    resize() {
+        let aspect = CFG.w / CFG.h;
+        let winW = window.innerWidth;
+        let winH = window.innerHeight;
+        let winAspect = winW / winH;
+        if (winAspect > aspect) {
+            this.canvas.height = winH;
+            this.canvas.width = winH * aspect;
+        } else {
+            this.canvas.width = winW;
+            this.canvas.height = winW / aspect;
+        }
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset
+        this.ctx.scale(this.canvas.width / CFG.w, this.canvas.height / CFG.h);
+    },
+    
+    isKeyDown(code) { return !!this.keys[code]; },
+    
+    loop(timestamp) {
+        let dt = (timestamp - this.lastTime) / 16.67;
+        this.lastTime = timestamp;
+        dt = M.clamp(dt, 0, 3);
+        
+        this.update(dt);
+        this.draw();
+        
+        this.prevKeys = {...this.keys};
+        window.gameAnimationId = requestAnimationFrame(t => this.loop(t));
+    },
+    
+    update(dt) {
+        Game.update(dt);
+        this.entities.forEach(e => e.update(dt));
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            this.particles[i].update(dt);
+            if (this.particles[i].dead) this.particles.splice(i, 1);
+        }
+        Camera.update(dt);
+    },
+    
+    draw() {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.fillStyle = '#080810';
+        ctx.fillRect(0, 0, CFG.w, CFG.h);
+        
+        ctx.translate(Camera.x, Camera.y);
+        ctx.scale(Camera.zoom, Camera.zoom);
+        let shakeX = (Math.random() - 0.5) * Camera.shake;
+        let shakeY = (Math.random() - 0.5) * Camera.shake;
+        ctx.translate(shakeX, shakeY);
+        
+        Renderer.drawEnvironment(ctx);
+        
+        this.entities.sort((a, b) => a.zIndex - b.zIndex);
+        this.entities.forEach(e => e.draw(ctx));
+        
+        ctx.globalCompositeOperation = 'lighter';
+        this.particles.forEach(p => p.draw(ctx));
+        ctx.globalCompositeOperation = 'source-over';
+        
+        Renderer.drawRimFront(ctx);
+        ctx.restore();
+    }
+};
+
+// ==========================================
+// 4. ENTITIES
+// ==========================================
+
+class Entity {
+    constructor(x, y) {
+        this.pos = {x, y};
+        this.vel = {x: 0, y: 0};
+        this.zIndex = 1;
+    }
+    update(dt) {}
+    draw(ctx) {}
+}
+
+class Ball extends Entity {
+    constructor() {
+        super(CFG.w / 2, 200);
+        this.radius = 12;
+        this.friction = 0.99;
+        this.bounciness = 0.75;
+        this.owner = null; 
+        this.lastOwner = null;
+        this.pickupTimer = 0;
+        this.rotation = 0;
+        this.scored = false;
+        this.zIndex = 10;
+    }
+    
+    update(dt) {
+        if (this.pickupTimer > 0) this.pickupTimer -= dt;
+
+        if (this.owner) {
+            this.pos = this.owner.getHandPos();
+            this.vel = {x: this.owner.vel.x, y: this.owner.vel.y};
+            this.rotation += this.vel.x * 0.1;
+            return;
+        }
+
+        this.vel.y += CFG.gravity * dt;
+        this.vel.x *= Math.pow(this.friction, dt);
+        this.vel.y *= Math.pow(0.995, dt);
+
+        this.pos.x += this.vel.x * dt;
+        this.pos.y += this.vel.y * dt;
+        this.rotation += this.vel.x * 0.05 * dt;
+
+        if (this.pos.y > CFG.floorY - this.radius) {
+            this.pos.y = CFG.floorY - this.radius;
+            this.vel.y *= -this.bounciness;
+            this.vel.x *= 0.9;
+            if (Math.abs(this.vel.y) < 2) this.vel.y = 0;
+            if (Math.abs(this.vel.y) > 5) VFX.dust(this.pos.x, this.pos.y + 10);
+        }
+
+        if (this.pos.x < this.radius) { this.pos.x = this.radius; this.vel.x *= -0.6; }
+        if (this.pos.x > CFG.w - this.radius) { this.pos.x = CFG.w - this.radius; this.vel.x *= -0.6; }
+
+        this.checkRimPhysics();
+    }
+    
+    checkRimPhysics() {
+        // 籃板
+        if (M.circleRect(this.pos.x, this.pos.y, this.radius, CFG.backboardX, CFG.rimY - 80, 10, 100)) {
+             this.vel.x *= -0.6;
+             this.pos.x = CFG.backboardX - this.radius - 2;
+             VFX.spark(this.pos.x + this.radius, this.pos.y);
+        }
+        
+        // 籃框邊緣
+        const rims = [{x: CFG.rimX - CFG.rimRadius, y: CFG.rimY}, {x: CFG.rimX + CFG.rimRadius, y: CFG.rimY}];
+        rims.forEach(p => {
+            let d = M.dist(this.pos.x, this.pos.y, p.x, p.y);
+            if (d < this.radius + 3) {
+                let nx = (this.pos.x - p.x) / d;
+                let ny = (this.pos.y - p.y) / d;
+                let dot = this.vel.x * nx + this.vel.y * ny;
+                this.vel.x = (this.vel.x - 2 * dot * nx) * 0.7;
+                this.vel.y = (this.vel.y - 2 * dot * ny) * 0.7;
+                let push = (this.radius + 3 - d) + 1;
+                this.pos.x += nx * push;
+                this.pos.y += ny * push;
+                VFX.spark(p.x, p.y, 3);
+            }
+        });
+        
+        // 得分
+        if (!this.scored && this.vel.y > 0) {
+            if (this.pos.y > CFG.rimY && this.pos.y < CFG.rimY + 15) {
+                if (this.pos.x > rims[0].x + 5 && this.pos.x < rims[1].x - 5) {
+                    Game.onScore(this.lastOwner, false);
+                }
+            }
+        }
+    }
+    
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        ctx.rotate(this.rotation);
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI*2);
+        ctx.fillStyle = CFG.colors.ball;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#331a00';
+        ctx.beginPath();
+        ctx.moveTo(-this.radius, 0); ctx.lineTo(this.radius, 0);
+        ctx.moveTo(0, -this.radius); ctx.lineTo(0, this.radius);
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class Player extends Entity {
+    constructor(isHuman, x, color) {
+        super(x, CFG.floorY);
+        this.isHuman = isHuman;
+        this.color = color;
+        this.facing = isHuman ? 1 : -1; 
+        
+        this.speed = 6;
+        this.jumpForce = 15;
+        this.stamina = 100;
+        this.charge = 0;
+        this.stealCooldown = 0;
+        this.stunTimer = 0;
+        
+        // State: IDLE, RUN, JUMP, CHARGE, DUNK, STUNNED
+        this.state = 'IDLE'; 
+        this.onGround = false;
+    }
+    
+    update(dt) {
+        if (this.stunTimer > 0) {
+            this.stunTimer -= dt;
+            this.state = 'STUNNED';
+        } else if (this.state === 'STUNNED') {
+            this.state = 'IDLE';
+        }
+        
+        if (this.stealCooldown > 0) this.stealCooldown -= dt;
+        if (this.stamina < 100) this.stamina += 0.2 * dt;
+
+        if (this.state === 'DUNK') {
+            // 灌籃物理：強制飛向籃框
+            let dx = CFG.rimX - this.pos.x;
+            let dy = (CFG.rimY - 40) - this.pos.y; // 瞄準籃框上方一點
+            let dist = Math.hypot(dx, dy);
+            
+            if (dist < 20 || this.pos.y > CFG.floorY) {
+                this.finishDunk();
+            } else {
+                // 飛向目標
+                this.pos.x += (dx / dist) * 12 * dt;
+                this.pos.y += (dy / dist) * 12 * dt;
+            }
+        } else if (this.state !== 'STUNNED') {
+            if (this.isHuman) this.handleInput(dt);
+            else this.handleAI(dt);
+            
+            // 標準物理
+            this.vel.y += CFG.gravity * dt;
+            this.pos.x += this.vel.x * dt;
+            this.pos.y += this.vel.y * dt;
+            
+            if (this.pos.y >= CFG.floorY) {
+                this.pos.y = CFG.floorY;
+                this.vel.y = 0;
+                this.onGround = true;
+            } else {
+                this.onGround = false;
+                this.vel.x *= Math.pow(0.98, dt);
+            }
+            
+            this.pos.x = M.clamp(this.pos.x, 20, CFG.w - 20);
+            if (this.onGround && this.state !== 'RUN') this.vel.x *= Math.pow(0.8, dt);
+        }
+
+        this.checkBallInteraction();
+    }
+    
+    handleInput(dt) {
+        const left = Engine.isKeyDown('ArrowLeft') || Engine.isKeyDown('KeyA');
+        const right = Engine.isKeyDown('ArrowRight') || Engine.isKeyDown('KeyD');
+        const jump = Engine.isKeyDown('ArrowUp') || Engine.isKeyDown('KeyW');
+        const dash = Engine.isKeyDown('ShiftLeft');
+        const shoot = Engine.isKeyDown('Space');
+        const hasBall = Game.ball.owner === this;
+        
+        // 1. 移動
+        if (this.state !== 'CHARGE') { 
+            let moveSpd = this.speed * (dash ? 1.5 : 1);
+            if (left) {
+                this.vel.x -= moveSpd * 0.2 * dt;
+                this.facing = -1;
+                if (this.onGround) this.state = 'RUN';
+                if (dash) this.stamina -= 0.5 * dt;
+            } else if (right) {
+                this.vel.x += moveSpd * 0.2 * dt;
+                this.facing = 1;
+                if (this.onGround) this.state = 'RUN';
+                if (dash) this.stamina -= 0.5 * dt;
+            } else if (this.onGround) {
+                this.state = 'IDLE';
+            }
+            this.vel.x = M.clamp(this.vel.x, -moveSpd, moveSpd);
+        }
+        
+        // 2. 跳躍
+        if (jump && this.onGround && this.state !== 'CHARGE') {
+            this.vel.y = -this.jumpForce;
+            this.onGround = false;
+            this.state = 'JUMP';
+            this.stamina -= 5;
+            if (!hasBall && this.stamina > 10) this.attemptBlock();
+        }
+        
+        // 3. 投籃 / 灌籃
+        if (hasBall) {
+            // 灌籃判定：靠近籃框 (X > 750)，有衝刺速度，且按下投籃
+            const distToRim = Math.abs(this.pos.x - CFG.rimX);
+            const isDashing = Math.abs(this.vel.x) > this.speed;
+            
+            if (shoot && isDashing && distToRim < 300 && this.facing === 1 && this.stamina > 20) {
+                // 觸發灌籃！
+                this.state = 'DUNK';
+                this.stamina -= 20;
+                this.vel.y = -10; // 起跳
+                Game.showMsg("DUNK!", "");
+            } else if (shoot) {
+                this.state = 'CHARGE';
+                this.charge += 0.02 * dt;
+                if (this.charge > 1.2) this.charge = 0;
+            } else if (this.state === 'CHARGE') {
+                this.shoot();
+                this.state = 'IDLE';
+            }
+        } else {
+            // 防守：抄截
+            if (dash && this.stealCooldown <= 0 && this.stamina > 20 && Math.abs(this.vel.x) > 2) {
+                this.attemptSteal();
+            }
+        }
+    }
+    
+    handleAI(dt) {
+        const ball = Game.ball;
+        const hasBall = ball.owner === this;
+        const opponent = Game.p1;
+        
+        if (hasBall) {
+            const distToHoop = Math.abs(this.pos.x - CFG.rimX);
+            if (distToHoop > 300) {
+                this.facing = 1;
+                this.vel.x += this.speed * 0.2 * dt;
+                this.state = 'RUN';
+            } else {
+                this.vel.x *= 0.8;
+                if (this.state !== 'CHARGE') {
+                    if (Math.random() < 0.02) { 
+                        this.state = 'CHARGE';
+                        this.aiTargetCharge = M.rand(CFG.perfectChargeMin, CFG.perfectChargeMax);
+                    }
+                } else {
+                    this.charge += 0.02 * dt;
+                    if (this.charge >= this.aiTargetCharge) {
+                        this.shoot();
+                        this.state = 'IDLE';
+                    }
+                }
+            }
+        } else {
+            let defTargetX = opponent.pos.x + 80;
+            if (this.pos.x < defTargetX) this.vel.x += this.speed * 0.15 * dt;
+            else this.vel.x -= this.speed * 0.15 * dt;
+            this.facing = this.pos.x < opponent.pos.x ? 1 : -1;
+            
+            if (Math.abs(this.pos.x - opponent.pos.x) < 60 && ball.owner === opponent && this.stealCooldown <= 0) {
+                if (Math.random() < 0.02) this.attemptSteal();
+            }
+        }
+        this.vel.x = M.clamp(this.vel.x, -this.speed, this.speed);
+    }
+    
+    finishDunk() {
+        // 完成灌籃
+        Game.onScore(this, true); // true = dunk
+        Game.ball.owner = null;
+        Game.ball.pos = {x: CFG.rimX, y: CFG.rimY + 20}; // 球穿過籃網
+        Game.ball.vel = {x: 0, y: 10}; // 向下重扣
+        this.vel = {x: 0, y: 0};
+        this.state = 'IDLE'; // 或 FALL
+        this.onGround = false;
+        Camera.shakeScreen(15);
+        VFX.impact(CFG.rimX, CFG.rimY);
+    }
+
+    shoot() {
+        const ball = Game.ball;
+        if (ball.owner !== this) return;
+        
+        ball.owner = null;
+        ball.lastOwner = this;
+        ball.pickupTimer = 60; 
+        
+        let precision = 0;
+        const minP = CFG.perfectChargeMin;
+        const maxP = CFG.perfectChargeMax;
+        let feedback = "LATE";
+        let feedbackColor = "#ccc";
+
+        if (this.charge >= minP && this.charge <= maxP) {
+            precision = 0;
+            feedback = "PERFECT";
+            feedbackColor = "#0f0";
+            VFX.flash(this.pos.x, this.pos.y);
+        } else {
+            let diff = Math.min(Math.abs(this.charge - minP), Math.abs(this.charge - maxP));
+            precision = diff * 4;
+            feedback = this.charge < minP ? "EARLY" : "LATE";
+        }
+        
+        if (this.isHuman) Game.showMsg(feedback, "", feedbackColor);
+        
+        const dx = CFG.rimX - this.pos.x;
+        let basePower = 15 + (dx / 40); 
+        let angle = -Math.PI / 2.5;
+        if (dx > 400) angle = -Math.PI / 3;
+        
+        if (precision > 0) {
+            angle += (Math.random() - 0.5) * precision;
+            basePower *= (1 - precision * 0.3);
+        }
+
+        ball.vel.x = Math.cos(angle) * basePower + this.vel.x * 0.5;
+        ball.vel.y = Math.sin(angle) * basePower;
+        this.charge = 0;
+        Camera.zoomShot();
+    }
+    
+    attemptSteal() {
+        this.stealCooldown = 60;
+        this.stamina -= 20;
+        this.vel.x = this.facing * 15;
+        VFX.dust(this.pos.x, this.pos.y);
+        
+        const target = this.isHuman ? Game.cpu : Game.p1;
+        const dist = M.dist(this.pos.x, this.pos.y, target.pos.x, target.pos.y);
+        
+        if (dist < 60 && Game.ball.owner === target && target.onGround) {
+            let chance = 0.4 + (this.stamina / 200);
+            if (Math.random() < chance) {
+                Game.showMsg("STEAL!", "", "#0ff");
+                Game.ball.owner = null;
+                Game.ball.pickupTimer = 30;
+                Game.ball.vel = {x: this.facing * 5, y: -10};
+                target.stunTimer = 60;
+                target.vel.x = -this.facing * 5;
+                VFX.impact(target.pos.x, target.pos.y - 40);
+                Camera.shakeScreen(5);
+            } else {
+                 Game.showMsg("MISS", "", "#888");
+            }
+        }
+    }
+    
+    attemptBlock() {
+        this.stamina -= 10;
+        const target = this.isHuman ? Game.cpu : Game.p1;
+        const ball = Game.ball;
+        const dist = Math.abs(this.pos.x - target.pos.x);
+        
+        if (dist < 50 && target.state === 'CHARGE') {
+             Game.showMsg("DENIED!", "", "#f05");
+             ball.owner = null;
+             ball.vel = {x: -target.facing * 15, y: 5};
+             ball.pickupTimer = 40;
+             target.state = 'STUNNED';
+             target.stunTimer = 30;
+             Camera.shakeScreen(8);
+             return;
+        }
+        
+        const ballDistX = Math.abs(this.pos.x - ball.pos.x);
+        const ballDistY = Math.abs((this.pos.y - 100) - ball.pos.y);
+        if (!ball.owner && ball.lastOwner === target && ball.pickupTimer > 0 && ballDistX < 40 && ballDistY < 60) {
+             Game.showMsg("BLOCK!", "", "#f05");
+             ball.vel.x *= -0.5;
+             ball.vel.y = 10;
+             VFX.impact(ball.pos.x, ball.pos.y);
+             Camera.shakeScreen(8);
+        }
+    }
+    
+    checkBallInteraction() {
+        const ball = Game.ball;
+        if (!ball.owner && ball.pickupTimer <= 0 && this.state !== 'STUNNED') {
+            const d = M.dist(this.pos.x, this.pos.y - 40, ball.pos.x, ball.pos.y);
+            if (d < 50) {
+                ball.owner = this;
+                ball.vel = {x:0, y:0};
+                this.charge = 0;
+            }
+        }
+    }
+    
+    getHandPos() {
+        let hx = this.pos.x + (this.facing * 25);
+        let hy = this.pos.y - 45;
+        let dribble = 0;
+        if (this.state === 'IDLE' || this.state === 'RUN') {
+             dribble = Math.abs(Math.sin(Date.now() / 150)) * 25;
+        } else if (this.state === 'CHARGE') {
+             hx = this.pos.x + (this.facing * 5);
+             hy = this.pos.y - 95;
+        } else if (this.state === 'DUNK') {
+             hx = this.pos.x + (this.facing * 20);
+             hy = this.pos.y - 100; // 手舉高灌籃
+        }
+        return {x: hx, y: hy + dribble};
+    }
+
+    draw(ctx) {
+        const x = this.pos.x;
+        const y = this.pos.y;
+        
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // 投籃進度條 (直接繪製在 Player 內部，確保不會消失)
+        if (this.state === 'CHARGE') {
+            const barW = 60; const barH = 6;
+            const barX = -barW/2; const barY = -120;
+            ctx.fillStyle = '#333'; ctx.fillRect(barX, barY, barW, barH);
+            const minX = barX + barW * CFG.perfectChargeMin;
+            const widthP = barW * (CFG.perfectChargeMax - CFG.perfectChargeMin);
+            ctx.fillStyle = '#fff'; ctx.fillRect(minX, barY - 2, widthP, barH + 4);
+            let pct = M.clamp(this.charge, 0, 1);
+            let color = (this.charge >= CFG.perfectChargeMin && this.charge <= CFG.perfectChargeMax) ? '#0f0' : '#ff0';
+            if (this.charge > 1) color = '#f00';
+            ctx.fillStyle = color; ctx.fillRect(barX, barY, barW * pct, barH);
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(barX, barY, barW, barH);
+        }
+
+        // 暈眩星星
+        if (this.state === 'STUNNED') {
+            ctx.fillStyle = '#ff0';
+            for(let i=0; i<3; i++) {
+                let ang = (Date.now()/200) + (i * 2);
+                let sx = Math.cos(ang) * 20;
+                let sy = Math.sin(ang) * 10 - 100;
+                ctx.beginPath(); ctx.arc(sx, sy, 3, 0, Math.PI*2); ctx.fill();
+            }
+        }
+
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        let headY = -80; let hipY = -40;
+        let legL = {x: -10, y: 0}; let legR = {x: 10, y: 0};
+        
+        if (this.state === 'RUN') {
+            let cycle = Date.now() / 100;
+            legL.x = Math.sin(cycle) * 15;
+            legR.x = Math.sin(cycle + Math.PI) * 15;
+            legL.y = Math.min(0, Math.cos(cycle) * 10 - 5);
+            legR.y = Math.min(0, Math.cos(cycle + Math.PI) * 10 - 5);
+        } else if (!this.onGround) {
+            legL = {x: -15, y: -10}; legR = {x: 15, y: -5};
+        }
+        
+        // 身體繪製
+        ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, headY, 12, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, headY + 12); ctx.lineTo(0, hipY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, hipY); ctx.lineTo(legL.x, legL.y); ctx.moveTo(0, hipY); ctx.lineTo(legR.x, legR.y); ctx.stroke();
+        
+        let handPos = this.getHandPos();
+        ctx.beginPath(); ctx.moveTo(0, headY + 20); ctx.lineTo(handPos.x - x, handPos.y - y); ctx.stroke();
+        
+        ctx.fillStyle = this.color; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(this.isHuman ? 'P1' : 'CPU', 0, -100);
+        ctx.restore();
+    }
+}
+
+// ==========================================
+// 5. SYSTEMS
+// ==========================================
+const VFX = {
+    dust(x, y) { for(let i=0; i<5; i++) Engine.particles.push(new Particle(x, y, 'dust')); },
+    spark(x, y, count=5) { for(let i=0; i<count; i++) Engine.particles.push(new Particle(x, y, 'spark')); },
+    impact(x, y) { Engine.particles.push(new Particle(x, y, 'impact')); this.spark(x, y, 10); },
+    flash(x, y) { Engine.particles.push(new Particle(x, y, 'flash')); }
+};
+
+class Particle {
+    constructor(x, y, type) {
+        this.pos = {x, y}; this.type = type; this.life = 1.0; this.dead = false;
+        if (type === 'dust') { this.vel = {x: M.rand(-2, 2), y: M.rand(-1, -3)}; this.color = '#888'; this.size = M.rand(3, 6); }
+        else if (type === 'spark') { this.vel = {x: M.rand(-5, 5), y: M.rand(-5, 5)}; this.color = '#fff'; this.size = 2; }
+        else if (type === 'impact') { this.vel = {x:0, y:0}; this.color = '#fff'; this.size = 20; this.life = 0.2; }
+        else if (type === 'flash') { this.vel = {x:0, y:-2}; this.color = '#00f3ff'; this.size = 50; this.life = 0.3; }
+    }
+    update(dt) {
+        this.pos.x += this.vel.x * dt; this.pos.y += this.vel.y * dt; this.life -= 0.05 * dt;
+        if (this.type === 'spark') this.vel.y += 0.2 * dt;
+        if (this.life <= 0) this.dead = true;
+    }
+    draw(ctx) {
+        ctx.globalAlpha = this.life; ctx.fillStyle = this.color;
+        if (this.type === 'impact' || this.type === 'flash') { ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.size * (1-this.life), 0, Math.PI*2); ctx.fill(); }
+        else { ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.size, 0, Math.PI*2); ctx.fill(); }
+        ctx.globalAlpha = 1;
+    }
+}
+
+const Camera = {
+    x: 0, y: 0, zoom: 1, targetZoom: 1, shake: 0,
+    update(dt) {
+        let p = Game.p1.pos; let b = Game.ball.pos; let cx = (p.x + b.x) / 2;
+        let targetX = (CFG.w / 2) - cx;
+        targetX = M.clamp(targetX, -200, 200);
+        this.x += (targetX - this.x) * 0.1 * dt;
+        this.zoom += (this.targetZoom - this.zoom) * 0.05 * dt;
+        if (this.shake > 0) this.shake *= 0.9;
+        if (this.shake < 0.5) this.shake = 0;
+    },
+    shakeScreen(amt) { this.shake = amt; },
+    zoomShot() { this.targetZoom = 1.1; setTimeout(() => this.targetZoom = 1.0, 1000); }
+};
+
+const Renderer = {
+    drawEnvironment(ctx) {
+        ctx.fillStyle = '#111'; ctx.fillRect(0, CFG.floorY, CFG.w, CFG.h - CFG.floorY);
+        ctx.strokeStyle = '#444'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, CFG.floorY); ctx.lineTo(CFG.w, CFG.floorY); ctx.stroke();
+        ctx.beginPath(); ctx.arc(CFG.rimX, CFG.rimY + 250, 450, Math.PI * 0.7, Math.PI * 1.3); ctx.stroke();
+        ctx.fillStyle = '#222'; ctx.fillRect(CFG.backboardX + 10, CFG.rimY - 200, 30, 600);
+        let g = ctx.createRadialGradient(CFG.rimX, 100, 20, CFG.rimX, 300, 400);
+        g.addColorStop(0, 'rgba(255, 255, 200, 0.15)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CFG.rimX, 300, 400, 0, Math.PI*2); ctx.fill();
+    },
+    drawRimFront(ctx) {
+        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(CFG.backboardX, CFG.rimY - 80, 5, 100);
+        ctx.strokeStyle = CFG.colors.rim; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(CFG.backboardX, CFG.rimY); ctx.lineTo(CFG.rimX - CFG.rimRadius, CFG.rimY); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(CFG.rimX - CFG.rimRadius, CFG.rimY); ctx.lineTo(CFG.rimX - 10, CFG.rimY + 40); ctx.lineTo(CFG.rimX + 15, CFG.rimY + 40); ctx.lineTo(CFG.backboardX, CFG.rimY); ctx.stroke();
+    }
+};
+
+// ==========================================
+// 6. GAME LOGIC
+// ==========================================
+const Game = {
+    p1: null, cpu: null, ball: null, scores: {p1: 0, cpu: 0},
+    start() {
+        this.p1 = new Player(true, 200, CFG.colors.p1);
+        this.cpu = new Player(false, 800, CFG.colors.cpu);
+        this.ball = new Ball();
+        Engine.entities = [this.p1, this.cpu, this.ball];
+        this.resetRound();
+    },
+    resetRound() {
+        this.p1.pos = {x: 200, y: CFG.floorY};
+        this.cpu.pos = {x: 800, y: CFG.floorY};
+        this.p1.vel = {x:0, y:0}; this.cpu.vel = {x:0, y:0};
+        
+        // 開球位置：球員中間
+        let midX = (this.p1.pos.x + this.cpu.pos.x) / 2;
+        this.ball.pos = {x: midX, y: 300}; 
+        this.ball.vel = {x: 0, y: -2}; // 輕微拋高
+        this.ball.owner = null;
+        this.ball.pickupTimer = 20;
+        this.ball.scored = false;
+        
+        this.showMsg("TIP OFF!", "", "#fff");
+    },
+    update(dt) {
+        document.getElementById('p1-stamina').style.width = this.p1.stamina + '%';
+        document.getElementById('cpu-stamina').style.width = this.cpu.stamina + '%';
+        if (this.scores.p1 >= 11 || this.scores.cpu >= 11) {
+            setTimeout(() => { this.scores.p1 = 0; this.scores.cpu = 0; this.updateScoreUI(); this.resetRound(); }, 3000);
+        }
+    },
+    onScore(scorer, isDunk=false) {
+        if (this.ball.scored) return;
+        this.ball.scored = true;
+        let points = 2;
+        if (scorer === this.p1) this.scores.p1 += points; else this.scores.cpu += points;
+        this.updateScoreUI();
+        let txt = isDunk ? "MONSTER DUNK!" : "SWISH!";
+        this.showMsg(txt, "+2 POINTS", isDunk ? "#ff0000" : "#ffdd00");
+        VFX.spark(CFG.rimX, CFG.rimY, 20);
+        Camera.shakeScreen(isDunk ? 15 : 5);
+        setTimeout(() => this.resetRound(), 2000);
+    },
+    updateScoreUI() {
+        document.getElementById('p1-score').innerText = this.scores.p1.toString().padStart(2, '0');
+        document.getElementById('cpu-score').innerText = this.scores.cpu.toString().padStart(2, '0');
+    },
+    showMsg(main, sub, color="#ffdd00") {
+        const el = document.getElementById('center-msg');
+        document.getElementById('msg-main').innerText = main;
+        document.getElementById('msg-main').style.color = color;
+        document.getElementById('msg-desc').innerText = sub;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 1500);
+    }
+};
+
+Engine.init();
+})();
+</script>
+</body>
+</html>

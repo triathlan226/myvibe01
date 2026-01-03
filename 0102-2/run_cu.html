@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幾何無盡冒險 (Geometric Endless Dash)</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111; /* 這是第二版的經典深色背景 */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+        }
+        
+        /* UI 覆蓋層 - 修正層級問題，確保按鈕可點擊 */
+        .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            display: none; 
+            background: rgba(20, 20, 20, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            border: 2px solid #00ffcc;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+            min-width: 320px;
+            z-index: 1000; /* 確保在畫布之上 */
+        }
+
+        h1 { margin: 0 0 20px 0; font-size: 2.5rem; color: #00ffcc; text-shadow: 0 0 10px #00ffcc; }
+        h2 { margin: 0 0 15px 0; color: #ff0055; text-shadow: 0 0 10px #ff0055; }
+        p { font-size: 1.2rem; line-height: 1.6; color: #ddd; }
+        
+        .btn {
+            background: transparent;
+            border: 2px solid #00ffcc;
+            padding: 15px 40px;
+            color: #00ffcc;
+            font-size: 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.2s;
+            font-weight: bold;
+            text-shadow: 0 0 5px #00ffcc;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
+        }
+        .btn:hover {
+            background: #00ffcc;
+            color: #000;
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.8);
+            transform: scale(1.05);
+        }
+        .btn-small {
+            padding: 8px 20px;
+            font-size: 1rem;
+            margin: 5px;
+            border-color: #aaa;
+            color: #aaa;
+        }
+        
+        .btn-upgrade {
+            border-color: #ffff00;
+            color: #ffff00;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: none;
+            pointer-events: none;
+            z-index: 900;
+        }
+        .hud-left { float: left; }
+        .hud-right { float: right; text-align: right; }
+        
+        .stat-box {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 20px;
+            border-radius: 20px;
+            color: white;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid #444;
+        }
+        
+        .hp-container { display: flex; gap: 5px; }
+        .hp-dot {
+            width: 20px;
+            height: 20px;
+            background-color: #ff0055;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ff0055;
+        }
+        .hp-dot.lost {
+            background-color: #333;
+            box-shadow: none;
+            border: 1px solid #555;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .shop-info { text-align: left; }
+        .price-tag { color: #ffff00; font-weight: bold; text-shadow: 0 0 5px rgba(255, 255, 0, 0.5); }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-left">
+            <div class="stat-box">
+                <span style="color:#ff0055; font-weight:bold;">HP</span>
+                <div class="hp-container" id="hpDisplay">
+                    <div class="hp-dot"></div><div class="hp-dot"></div><div class="hp-dot"></div>
+                </div>
+            </div>
+            <div class="stat-box" id="buffDisplay" style="display:none; color: #00ffff;"></div>
+        </div>
+        <div class="hud-right">
+            <div class="stat-box">SCORE <span id="scoreDisplay" style="margin-left:10px; color:#00ffcc; font-weight:bold;">0</span></div>
+            <div class="stat-box" style="color: #ffff00;">$ <span id="coinDisplay" style="margin-left:10px;">0</span></div>
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="startScreen" class="overlay" style="display: block;">
+        <h1>幾何無盡冒險</h1>
+        <p>A / D 或 左右方向鍵移動<br>Space 或 上方向鍵跳躍</p>
+        <p>跟隨 <span style="color:#00ffcc">青色平台</span>，躲避紅色尖刺<br>收集金幣強化你的能力！</p>
+        <button class="btn" onclick="game.start()">開始遊戲</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" class="overlay">
+        <h2>遊戲結束</h2>
+        <p>本次得分: <span id="finalScore" style="color:#00ffcc; font-weight:bold; font-size:1.5em">0</span></p>
+        <p>持有金幣: <span id="finalCoins" style="color:#ffff00; font-weight:bold">0</span></p>
+        
+        <div style="margin: 20px 0; border-top: 1px solid #333; border-bottom: 1px solid #333; padding: 10px 0;">
+            <h3 style="color:#ddd;">能力商店</h3>
+            <div class="shop-item">
+                <div class="shop-info">
+                    <div>磁鐵持續時間 (Lv <span id="magnetLvl">1</span>)</div>
+                    <div class="price-tag">$<span id="magnetPrice">50</span></div>
+                </div>
+                <button class="btn btn-small btn-upgrade" onclick="game.upgrade('magnet')">升級</button>
+            </div>
+            <div class="shop-item">
+                <div class="shop-info">
+                    <div>護盾持續時間 (Lv <span id="shieldLvl">1</span>)</div>
+                    <div class="price-tag">$<span id="shieldPrice">50</span></div>
+                </div>
+                <button class="btn btn-small btn-upgrade" onclick="game.upgrade('shield')">升級</button>
+            </div>
+        </div>
+
+        <button class="btn" onclick="game.restart()">再來一次</button>
+    </div>
+
+    <script>
+        const CANVAS = document.getElementById('gameCanvas');
+        const CTX = CANVAS.getContext('2d');
+        
+        // 物理常數 (第二版參數)
+        const GRAVITY = 0.5;      
+        const JUMP_FORCE = -13;   
+        const MOVE_SPEED = 7;     
+        const FRICTION = 0.85;
+        const COYOTE_TIME = 10;   
+        
+        const COLORS = {
+            player: '#ffffff',     
+            playerGlow: '#00ccff', 
+            platform: '#00ffcc',   
+            platformDark: '#00332a', 
+            movingPlatform: '#aa00ff', 
+            movingPlatformDark: '#2a0033',
+            spike: '#ff0055',      
+            coin: '#ffff00',       
+            magnet: '#3366ff',     
+            shield: '#00ff66',     
+            bg: '#111111'          
+        };
+
+        const UPGRADES = {
+            magnet: { level: 1, duration: 300, price: 50 }, 
+            shield: { level: 1, duration: 300, price: 50 }
+        };
+
+        // --- 類別定義 ---
+
+        class Player {
+            constructor() {
+                this.width = 30;
+                this.height = 30;
+                this.x = 100;
+                this.y = 200; // 初始位置在上方，會自然落下
+                this.vx = 0;
+                this.vy = 0;
+                this.hp = 3;
+                
+                this.isGrounded = false;
+                this.coyoteTimer = 0; 
+                
+                this.magnetActive = false;
+                this.magnetTimer = 0;
+                this.shieldActive = false;
+                this.shieldTimer = 0;
+                this.invincibleTimer = 0;
+            }
+
+            update(input) {
+                if (input.keys['ArrowRight'] || input.keys['d'] || input.keys['D']) this.vx += 1.5;
+                else if (input.keys['ArrowLeft'] || input.keys['a'] || input.keys['A']) this.vx -= 1.5;
+                
+                this.vx *= FRICTION;
+                this.vx = Math.max(Math.min(this.vx, MOVE_SPEED), -MOVE_SPEED);
+
+                if (this.isGrounded) this.coyoteTimer = COYOTE_TIME;
+                else if (this.coyoteTimer > 0) this.coyoteTimer--;
+
+                if ((input.keys[' '] || input.keys['ArrowUp']) && this.coyoteTimer > 0) {
+                    this.vy = JUMP_FORCE;
+                    this.isGrounded = false;
+                    this.coyoteTimer = 0; 
+                }
+
+                this.vy += GRAVITY;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.magnetActive && --this.magnetTimer <= 0) this.magnetActive = false;
+                if (this.shieldActive && --this.shieldTimer <= 0) this.shieldActive = false;
+                if (this.invincibleTimer > 0) this.invincibleTimer--;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                if (this.invincibleTimer > 0 && Math.floor(Date.now() / 50) % 2 === 0) ctx.globalAlpha = 0.3;
+
+                if (this.shieldActive) {
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width/2, this.y + this.height/2, 35, 0, Math.PI * 2);
+                    ctx.strokeStyle = COLORS.shield;
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = COLORS.shield;
+                    ctx.shadowBlur = 10;
+                    ctx.stroke();
+                }
+
+                if (this.magnetActive) {
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width/2, this.y + this.height/2, 40, 0, Math.PI * 2);
+                    ctx.strokeStyle = COLORS.magnet;
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                }
+
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = COLORS.playerGlow;
+                ctx.fillStyle = COLORS.player;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                ctx.strokeStyle = COLORS.playerGlow;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                
+                ctx.shadowBlur = 0; 
+                ctx.fillStyle = '#000';
+                let eyeOff = this.vx > 0.5 ? 4 : (this.vx < -0.5 ? -4 : 0);
+                ctx.fillRect(this.x + 18 + eyeOff, this.y + 6, 4, 8);
+                ctx.fillRect(this.x + 8 + eyeOff, this.y + 6, 4, 8);
+                
+                ctx.restore();
+            }
+
+            takeDamage() {
+                if (this.shieldActive) {
+                    this.shieldActive = false;
+                    this.shieldTimer = 0;
+                    this.invincibleTimer = 60; 
+                    return false; 
+                }
+                if (this.invincibleTimer > 0) return false;
+
+                this.hp--;
+                this.invincibleTimer = 90; 
+                this.vy = -6; 
+                return true; 
+            }
+        }
+
+        class Platform {
+            constructor(x, y, w, h, type = 'static') {
+                this.x = x;
+                this.y = y;
+                this.width = w;
+                this.height = h;
+                this.type = type;
+                
+                this.startX = x;
+                this.startY = y;
+                this.moveSpeed = 2;
+                this.moveRange = 120;
+                this.moveDir = 1;
+                this.moveAxis = Math.random() > 0.5 ? 'x' : 'y';
+            }
+
+            update() {
+                if (this.type === 'moving') {
+                    if (this.moveAxis === 'x') {
+                        this.x += this.moveSpeed * this.moveDir;
+                        if (this.x > this.startX + this.moveRange || this.x < this.startX) this.moveDir *= -1;
+                    } else {
+                        this.y += this.moveSpeed * this.moveDir;
+                        if (this.y > this.startY + this.moveRange || this.y < this.startY - this.moveRange) this.moveDir *= -1;
+                    }
+                }
+            }
+
+            draw(ctx) {
+                let mainColor = this.type === 'moving' ? COLORS.movingPlatform : COLORS.platform;
+                let darkColor = this.type === 'moving' ? COLORS.movingPlatformDark : COLORS.platformDark;
+
+                ctx.save();
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = mainColor;
+                ctx.strokeStyle = mainColor;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+                ctx.shadowBlur = 0; 
+                ctx.fillStyle = darkColor;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                ctx.fillStyle = mainColor;
+                ctx.fillRect(this.x, this.y, this.width, 3);
+                ctx.restore();
+            }
+        }
+
+        class Spike {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 30;
+                this.height = 30;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.fillStyle = COLORS.spike;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = COLORS.spike;
+                
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + this.height);
+                ctx.moveTo(this.x + this.width / 2, this.y);
+                ctx.moveTo(this.x + this.width, this.y + this.height);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Collectible {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.width = 30;
+                this.height = 30;
+                this.type = type;
+                this.baseY = y;
+                this.floatOffset = 0;
+            }
+
+            update(player) {
+                this.floatOffset = Math.sin(Date.now() / 200) * 5;
+                this.y = this.baseY + this.floatOffset;
+
+                if (this.type === 'coin' && player.magnetActive) {
+                    let dx = player.x - this.x;
+                    let dy = player.y - this.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 400) { 
+                        this.x += dx * 0.15; 
+                        this.y += dy * 0.15;
+                        this.baseY = this.y;
+                    }
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                if (this.type === 'coin') {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = COLORS.coin;
+                    ctx.fillStyle = COLORS.coin;
+                    ctx.beginPath();
+                    ctx.arc(this.x + 15, this.y + 15, 10, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(this.x + 12, this.y + 12, 3, 0, Math.PI*2);
+                    ctx.fill();
+                } else if (this.type === 'magnet') {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = COLORS.magnet;
+                    ctx.fillStyle = COLORS.magnet;
+                    ctx.fillRect(this.x + 5, this.y + 5, 20, 20);
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText('M', this.x + 9, this.y + 21);
+                } else if (this.type === 'shield') {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = COLORS.shield;
+                    ctx.fillStyle = COLORS.shield;
+                    ctx.beginPath();
+                    ctx.arc(this.x + 15, this.y + 15, 12, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = 'black';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText('S', this.x + 10, this.y + 21);
+                }
+                ctx.restore();
+            }
+        }
+
+        // --- 遊戲邏輯 ---
+
+        class Game {
+            constructor() {
+                this.player = null;
+                this.platforms = [];
+                this.spikes = [];
+                this.collectibles = [];
+                
+                this.cameraX = 0;
+                this.cameraY = 0; 
+                
+                this.score = 0;
+                this.coins = 0;
+                this.totalCoins = 0;
+                
+                this.isRunning = false;
+                this.input = { keys: {} };
+                this.animId = null;
+
+                this.nextSpawnX = 0;
+                this.difficulty = 1;
+                this.gameOverFlag = false;
+
+                window.addEventListener('keydown', e => this.input.keys[e.key] = true);
+                window.addEventListener('keyup', e => this.input.keys[e.key] = false);
+                window.addEventListener('resize', () => this.resize());
+                this.resize();
+            }
+
+            resize() {
+                CANVAS.width = window.innerWidth;
+                CANVAS.height = window.innerHeight;
+            }
+
+            start() {
+                document.getElementById('startScreen').style.display = 'none';
+                document.getElementById('gameOverScreen').style.display = 'none';
+                document.getElementById('hud').style.display = 'block';
+                
+                this.reset();
+                this.isRunning = true;
+                this.gameOverFlag = false;
+                this.loop();
+            }
+
+            reset() {
+                this.player = new Player();
+                this.platforms = [];
+                this.spikes = [];
+                this.collectibles = [];
+                this.cameraX = 0;
+                this.cameraY = 0;
+                this.score = 0;
+                this.coins = 0;
+                this.difficulty = 1;
+                
+                // 這是第二版的初始生成邏輯：平台位於 Y=400 上下
+                let startY = CANVAS.height / 2 + 100; // 約在畫面中下方
+                this.player.x = 100;
+                this.player.y = startY - 100;
+                
+                this.createPlatform(50, startY, 1000, 'static'); 
+                this.nextSpawnX = 1050;
+                
+                this.updateUI();
+            }
+
+            createPlatform(x, y, w, type) {
+                this.platforms.push(new Platform(x, y, w, 30, type));
+            }
+
+            generateMap() {
+                while (this.nextSpawnX < this.cameraX + CANVAS.width + 500) {
+                    
+                    let maxGap = 150 + (this.difficulty * 30); 
+                    if (maxGap > 350) maxGap = 350;
+
+                    let gap = 80 + Math.random() * (maxGap - 80);
+                    let width = 150 + Math.random() * 250; 
+                    
+                    let lastP = this.platforms[this.platforms.length - 1];
+                    let yChange = (Math.random() - 0.5) * 150; 
+                    
+                    if (this.difficulty > 2) yChange *= 1.5;
+
+                    let newY = lastP.y + yChange;
+                    let type = Math.random() < 0.15 + (this.difficulty * 0.05) ? 'moving' : 'static';
+
+                    this.createPlatform(this.nextSpawnX + gap, newY, width, type);
+                    
+                    let p = this.platforms[this.platforms.length - 1];
+
+                    // **修正：提高尖刺生成機率 (0.5)** 讓您能看到它
+                    if (Math.random() < 0.5 + (this.difficulty * 0.1)) {
+                         let spikeX = p.x + Math.random() * (p.width - 40);
+                         this.spikes.push(new Spike(spikeX, p.y - 30));
+                    }
+
+                    if (Math.random() < 0.08) {
+                        let item = Math.random() > 0.5 ? 'magnet' : 'shield';
+                        this.collectibles.push(new Collectible(p.x + p.width/2, p.y - 80, item));
+                    } else if (Math.random() < 0.5) {
+                        let coins = Math.floor(Math.random() * 5) + 1;
+                        for(let i=0; i<coins; i++) {
+                            this.collectibles.push(new Collectible(p.x + 30 + i*40, p.y - 60, 'coin'));
+                        }
+                    }
+
+                    this.nextSpawnX = p.x + p.width;
+                }
+            }
+
+            checkCollisions() {
+                this.player.isGrounded = false;
+                
+                for (let p of this.platforms) {
+                    if (this.player.x < p.x + p.width &&
+                        this.player.x + this.player.width > p.x &&
+                        this.player.y + this.player.height > p.y &&
+                        this.player.y < p.y + p.height) {
+                            
+                        let prevBottom = (this.player.y - this.player.vy) + this.player.height;
+                        if (prevBottom <= p.y + 15 && this.player.vy >= 0) { 
+                             this.player.y = p.y - this.player.height;
+                             this.player.vy = 0;
+                             this.player.isGrounded = true;
+                             if (p.type === 'moving') {
+                                 if (p.moveAxis === 'x') this.player.x += p.moveSpeed * p.moveDir;
+                                 else this.player.y += p.moveSpeed * p.moveDir;
+                             }
+                        }
+                    }
+                }
+
+                for (let s of this.spikes) {
+                    if (this.rectIntersect(
+                        this.player.x + 5, this.player.y + 5, this.player.width - 10, this.player.height - 10,
+                        s.x + 10, s.y + 10, s.width - 20, s.height - 20
+                    )) { 
+                        if (this.player.takeDamage()) this.updateUI();
+                    }
+                }
+
+                for (let i = this.collectibles.length - 1; i >= 0; i--) {
+                    let c = this.collectibles[i];
+                    if (this.rectIntersect(this.player.x, this.player.y, this.player.width, this.player.height, c.x, c.y, c.width, c.height)) {
+                        if (c.type === 'coin') { this.score += 50; this.coins++; }
+                        else if (c.type === 'magnet') { this.player.magnetActive = true; this.player.magnetTimer = UPGRADES.magnet.duration; }
+                        else if (c.type === 'shield') { this.player.shieldActive = true; this.player.shieldTimer = UPGRADES.shield.duration; }
+                        this.collectibles.splice(i, 1);
+                        this.updateUI();
+                    }
+                }
+            }
+
+            rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2) {
+                return x2 < x1 + w1 && x2 + w2 > x1 && y2 < y1 + h1 && y2 + h2 > y1;
+            }
+
+            update() {
+                if (this.gameOverFlag) return;
+
+                this.player.update(this.input);
+                
+                let targetCamX = this.player.x - CANVAS.width * 0.25;
+                if (targetCamX < 0) targetCamX = 0;
+                this.cameraX += (targetCamX - this.cameraX) * 0.1;
+
+                // **鏡頭邏輯修復**
+                // 讓鏡頭跟隨，但當玩家掉落時，不要跟隨到底，這樣玩家才能 "掉出" 畫面
+                // 找出目前玩家所在的平台群的平均高度作為參考
+                let targetCamY = this.player.y - CANVAS.height * 0.5;
+                
+                // 尋找最後一個生成的平台作為底線參考
+                let lastP = this.platforms[this.platforms.length - 1];
+                if (lastP) {
+                     // 限制鏡頭最大 Y 值，如果玩家掉得比最後一個平台還低很多，鏡頭就不再往下
+                     let maxCamY = lastP.y - CANVAS.height * 0.3;
+                     if (targetCamY > maxCamY) targetCamY = maxCamY;
+                }
+                this.cameraY += (targetCamY - this.cameraY) * 0.08;
+
+                // **死亡判定修復**
+                // 只要玩家掉到相機邊界下方，或是絕對深度過深，就判死
+                // 這裡用相機邊界判定最直觀
+                if (this.player.y > this.cameraY + CANVAS.height + 100 || this.player.hp <= 0) {
+                    this.gameOver();
+                    return;
+                }
+
+                this.platforms.forEach(p => p.update());
+                this.collectibles.forEach(c => c.update(this.player));
+
+                this.generateMap();
+                this.checkCollisions();
+                
+                const limit = this.cameraX - 500;
+                this.platforms = this.platforms.filter(p => p.x + p.width > limit);
+                this.spikes = this.spikes.filter(s => s.x + s.width > limit);
+                this.collectibles = this.collectibles.filter(c => c.x + c.width > limit);
+
+                this.difficulty = 1 + (this.player.x / 4000); 
+                if (this.player.x > this.score) this.score = Math.floor(this.player.x);
+                
+                this.updateBuffUI();
+            }
+
+            draw() {
+                CTX.fillStyle = COLORS.bg;
+                CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
+
+                CTX.save();
+                CTX.strokeStyle = '#222';
+                CTX.lineWidth = 1;
+                CTX.beginPath();
+                let offsetX = -this.cameraX % 50;
+                let offsetY = -this.cameraY % 50;
+                for (let i = 0; i < CANVAS.width / 50 + 1; i++) {
+                    CTX.moveTo(i * 50 + offsetX, 0); CTX.lineTo(i * 50 + offsetX, CANVAS.height);
+                }
+                for (let i = 0; i < CANVAS.height / 50 + 1; i++) {
+                    CTX.moveTo(0, i * 50 + offsetY); CTX.lineTo(CANVAS.width, i * 50 + offsetY);
+                }
+                CTX.stroke();
+                CTX.restore();
+
+                CTX.save();
+                CTX.translate(-this.cameraX, -this.cameraY);
+
+                this.platforms.forEach(p => p.draw(CTX));
+                this.spikes.forEach(s => s.draw(CTX));
+                this.collectibles.forEach(c => c.draw(CTX));
+                this.player.draw(CTX);
+
+                CTX.restore(); 
+
+                document.getElementById('scoreDisplay').innerText = this.score;
+            }
+
+            loop() {
+                if (!this.isRunning) return;
+                this.update();
+                this.draw();
+                this.animId = requestAnimationFrame(() => this.loop());
+            }
+
+            gameOver() {
+                if (this.gameOverFlag) return;
+                this.gameOverFlag = true;
+                this.isRunning = false;
+                cancelAnimationFrame(this.animId);
+                
+                this.totalCoins += this.coins;
+                
+                document.getElementById('hud').style.display = 'none';
+                document.getElementById('gameOverScreen').style.display = 'block';
+                document.getElementById('finalScore').innerText = this.score;
+                document.getElementById('finalCoins').innerText = this.totalCoins;
+                this.updateShopUI();
+            }
+
+            restart() {
+                this.start();
+            }
+
+            updateUI() {
+                const hpContainer = document.getElementById('hpDisplay');
+                hpContainer.innerHTML = '';
+                for(let i=0; i<3; i++) {
+                    let dot = document.createElement('div');
+                    dot.className = 'hp-dot' + (i >= this.player.hp ? ' lost' : '');
+                    hpContainer.appendChild(dot);
+                }
+                document.getElementById('coinDisplay').innerText = this.coins;
+            }
+
+            updateBuffUI() {
+                const buffDiv = document.getElementById('buffDisplay');
+                let texts = [];
+                if (this.player.magnetActive) texts.push(`磁鐵 ${(this.player.magnetTimer/60).toFixed(1)}s`);
+                if (this.player.shieldActive) texts.push(`護盾 ${(this.player.shieldTimer/60).toFixed(1)}s`);
+                
+                if (texts.length > 0) {
+                    buffDiv.style.display = 'flex';
+                    buffDiv.innerText = texts.join(' | ');
+                } else {
+                    buffDiv.style.display = 'none';
+                }
+            }
+            
+            updateShopUI() {
+                document.getElementById('magnetLvl').innerText = UPGRADES.magnet.level;
+                document.getElementById('magnetPrice').innerText = UPGRADES.magnet.price;
+                document.getElementById('shieldLvl').innerText = UPGRADES.shield.level;
+                document.getElementById('shieldPrice').innerText = UPGRADES.shield.price;
+            }
+
+            upgrade(type) {
+                const item = UPGRADES[type];
+                if (this.totalCoins >= item.price) {
+                    this.totalCoins -= item.price;
+                    item.level++;
+                    item.duration += 120;
+                    item.price = Math.floor(item.price * 1.5);
+                    document.getElementById('finalCoins').innerText = this.totalCoins;
+                    this.updateShopUI();
+                } else {
+                    alert('金幣不足！');
+                }
+            }
+        }
+
+        window.game = new Game();
+
+    </script>
+</body>
+</html>

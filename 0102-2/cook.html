@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中華一番！傳說料理對決</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #2a0a0a;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .pattern-bg {
+            background-image: 
+                linear-gradient(rgba(42, 10, 10, 0.9), rgba(42, 10, 10, 0.9)),
+                url('https://www.transparenttextures.com/patterns/shattered-island.png');
+        }
+
+        /* Golden Glow Animation */
+        @keyframes sun-glow {
+            0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
+            50% { box-shadow: 0 0 50px 20px rgba(255, 215, 0, 1); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
+        }
+
+        @keyframes beam-rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .god-light {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 200vw;
+            height: 200vw;
+            background: conic-gradient(from 0deg, transparent 0%, rgba(255, 223, 0, 0.5) 10%, transparent 20%, rgba(255, 223, 0, 0.5) 30%, transparent 40%, rgba(255, 223, 0, 0.5) 50%, transparent 60%, rgba(255, 223, 0, 0.5) 70%, transparent 80%, rgba(255, 223, 0, 0.5) 90%, transparent 100%);
+            transform: translate(-50%, -50%);
+            animation: beam-rotate 10s linear infinite;
+            pointer-events: none;
+            z-index: 40;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .emblem {
+            width: 100px;
+            height: 100px;
+            background: white;
+            border-radius: 50%;
+            border: 4px solid #d4af37;
+            color: #c00;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: 900;
+            box-shadow: 0 0 20px #d4af37;
+        }
+
+        .fire-bar-container {
+            width: 100%;
+            height: 30px;
+            background: #333;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 2px solid #555;
+            position: relative;
+        }
+
+        .fire-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffcc00, #ff4500);
+            transition: width 0.1s linear;
+        }
+
+        .target-zone {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-left: 2px solid #fff;
+            border-right: 2px solid #fff;
+        }
+
+        /* Tool Selection Styling */
+        .tool-card {
+            transition: all 0.2s;
+        }
+        .tool-card.selected {
+            border-color: #fbbf24;
+            background-color: #451a03;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+        }
+    </style>
+</head>
+<body class="pattern-bg min-h-screen flex items-center justify-center p-4">
+
+    <!-- Game Container -->
+    <div id="game-container" class="relative w-full max-w-lg bg-red-900 border-4 border-yellow-600 rounded-lg shadow-2xl overflow-hidden min-h-[650px]">
+        
+        <!-- Light Beams Effect -->
+        <div id="god-light" class="god-light"></div>
+
+        <!-- Header -->
+        <div class="bg-red-800 p-4 border-b-4 border-yellow-600 flex justify-between items-center z-10 relative shadow-md">
+            <h1 class="text-2xl font-bold text-yellow-400 tracking-widest">中華一番！</h1>
+            <div class="text-yellow-200">特級廚師之路</div>
+        </div>
+
+        <!-- SCREEN: Start Menu -->
+        <div id="screen-start" class="flex flex-col items-center justify-center h-[550px] space-y-8 p-6 z-10 relative">
+            <div class="emblem animate-pulse">特</div>
+            <h2 class="text-4xl font-bold text-center text-yellow-400 drop-shadow-lg leading-relaxed">
+                傳說中的<br>料理對決
+            </h2>
+            <p class="text-center text-gray-300">
+                嚴選食材，掌控廚具，<br>用你的料理帶給人們幸福吧！
+            </p>
+            <button onclick="startGame()" class="px-8 py-3 bg-yellow-600 hover:bg-yellow-500 text-red-900 font-bold text-xl rounded shadow-[0_4px_0_rgb(120,50,0)] active:shadow-none active:translate-y-1 transition-all">
+                開始料理
+            </button>
+        </div>
+
+        <!-- SCREEN: Recipe Selection / Ingredient Phase -->
+        <div id="screen-ingredients" class="hidden flex flex-col h-full p-6 space-y-4 z-10 relative">
+            <div class="text-center mb-2">
+                <p class="text-gray-300 text-sm">今日考題</p>
+                <h3 id="target-dish-name" class="text-3xl font-bold text-yellow-400 my-1">魔幻麻婆豆腐</h3>
+                <p class="text-xs text-yellow-200" id="dish-hint">提示: 六味一體的豆腐料理</p>
+            </div>
+
+            <div class="bg-red-950/50 p-4 rounded border border-yellow-700/50 flex-grow overflow-y-auto">
+                <p class="text-sm mb-2 text-center text-yellow-100">選擇 3 種關鍵食材:</p>
+                <div class="grid grid-cols-4 gap-2" id="ingredient-grid">
+                    <!-- Ingredients injected by JS -->
+                </div>
+            </div>
+            
+            <div class="flex justify-between items-center bg-black/30 p-3 rounded mt-2">
+                <div class="flex space-x-2" id="selected-slots">
+                    <div class="w-10 h-10 bg-red-900 border border-yellow-600 rounded flex items-center justify-center text-xl"></div>
+                    <div class="w-10 h-10 bg-red-900 border border-yellow-600 rounded flex items-center justify-center text-xl"></div>
+                    <div class="w-10 h-10 bg-red-900 border border-yellow-600 rounded flex items-center justify-center text-xl"></div>
+                </div>
+                <button onclick="confirmIngredients()" id="btn-to-tools" disabled class="px-4 py-2 bg-gray-600 text-gray-300 font-bold rounded cursor-not-allowed transition-colors text-sm">
+                    下一步: 廚具
+                </button>
+            </div>
+        </div>
+
+        <!-- SCREEN: Tool Selection -->
+        <div id="screen-tools" class="hidden flex flex-col items-center justify-center h-[550px] p-6 space-y-6 z-10 relative">
+            <h3 class="text-2xl font-bold text-yellow-400">選擇料理工具</h3>
+            <p class="text-sm text-gray-300 text-center">工欲善其事，必先利其器。<br>這道料理該用什麼做？</p>
+            
+            <div class="grid grid-cols-2 gap-4 w-full" id="tools-grid">
+                <!-- Tools injected by JS -->
+            </div>
+
+            <button onclick="confirmTool()" id="btn-cook" disabled class="w-full py-3 bg-gray-600 text-gray-300 font-bold text-xl rounded shadow-[0_4px_0_rgb(50,50,50)] cursor-not-allowed transition-all mt-4">
+                開始烹飪!
+            </button>
+        </div>
+
+        <!-- SCREEN: Cooking Action -->
+        <div id="screen-cooking" class="hidden flex flex-col items-center justify-center h-[550px] p-6 space-y-6 z-10 relative">
+            <h3 class="text-2xl font-bold text-yellow-400">控制火候!</h3>
+            <p class="text-sm text-gray-300">連點按鈕，讓火力保持在金色區域！</p>
+            
+            <div class="w-48 h-48 relative flex items-center justify-center">
+                <!-- Tool Image representation updates dynamically -->
+                <div id="cooking-icon" class="text-8xl animate-bounce">🥘</div>
+                <div id="fire-effect" class="absolute bottom-0 text-6xl opacity-0 transition-opacity text-orange-500">🔥</div>
+            </div>
+
+            <div class="fire-bar-container">
+                <div class="target-zone" style="left: 60%; width: 20%;"></div>
+                <div id="current-fire" class="fire-bar"></div>
+            </div>
+
+            <div class="text-center">
+                <span id="time-remaining" class="text-3xl font-mono text-red-400">05.00</span> 秒
+            </div>
+
+            <button onmousedown="heatUp()" ontouchstart="heatUp()" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold text-2xl rounded shadow-[0_4px_0_rgb(100,0,0)] active:shadow-none active:translate-y-1">
+                注入靈魂! (連打)
+            </button>
+        </div>
+
+        <!-- SCREEN: Judgement -->
+        <div id="screen-judgement" class="hidden flex flex-col items-center justify-center h-[550px] p-6 text-center z-20 relative">
+            <div id="lid" class="transition-transform duration-1000 cursor-pointer" onclick="revealDish()">
+                <div class="text-9xl drop-shadow-2xl">🍲</div>
+                <p class="mt-4 text-yellow-200 animate-pulse">點擊揭開料理</p>
+            </div>
+
+            <div id="dish-reveal" class="hidden flex flex-col items-center">
+                <h2 id="result-title" class="text-4xl font-bold text-yellow-400 mb-2"></h2>
+                <div id="result-grade" class="text-6xl font-black text-red-500 my-4 border-4 border-red-500 rounded-full w-32 h-32 flex items-center justify-center bg-white transform rotate-[-15deg] shadow-lg">
+                    ?
+                </div>
+                <p id="result-comment" class="text-lg text-gray-200 mb-8 italic px-4"></p>
+                
+                <button onclick="resetGame()" class="px-6 py-2 bg-yellow-600 hover:bg-yellow-500 text-red-900 font-bold rounded">
+                    下一道菜
+                </button>
+            </div>
+        </div>
+
+        <!-- Overlay for High Score -->
+        <div id="delicious-overlay" class="fixed inset-0 pointer-events-none hidden z-50 flex items-center justify-center">
+            <h1 class="text-9xl font-black text-red-600 stroke-white drop-shadow-[0_0_10px_rgba(255,255,255,1)] transform scale-0 transition-transform duration-500" style="-webkit-text-stroke: 4px white;">
+                美味
+            </h1>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Data Definitions ---
+        const ingredientsData = [
+            { id: 'tofu', icon: '⬜', name: '豆腐' },
+            { id: 'chili', icon: '🌶️', name: '辣椒' },
+            { id: 'meat', icon: '🥩', name: '絞肉' },
+            { id: 'rice', icon: '🍚', name: '米飯' },
+            { id: 'egg', icon: '🥚', name: '雞蛋' },
+            { id: 'shrimp', icon: '🦐', name: '鮮蝦' },
+            { id: 'wrapper', icon: '🥟', name: '麵皮' },
+            { id: 'scallion', icon: '🥬', name: '青蔥' },
+            // New ingredients for difficulty
+            { id: 'fish', icon: '🐟', name: '鮮魚' },
+            { id: 'beef', icon: '🐂', name: '牛肉' },
+            { id: 'mushroom', icon: '🍄', name: '香菇' },
+            { id: 'carrot', icon: '🥕', name: '紅蘿蔔' },
+            { id: 'cabbage', icon: '🥗', name: '高麗菜' },
+            { id: 'sugar', icon: '🧂', name: '砂糖' },
+            { id: 'vinegar', icon: '🍶', name: '黑醋' },
+            { id: 'wine', icon: '🍷', name: '紹興酒' }
+        ];
+
+        const toolsData = [
+            { id: 'wok', icon: '🥘', name: '中華炒鍋', desc: '猛火快炒專用' },
+            { id: 'steamer', icon: '♨️', name: '竹蒸籠', desc: '鎖住原汁原味' },
+            { id: 'fryer', icon: '🍤', name: '油炸鍋', desc: '金黃酥脆' },
+            { id: 'pot', icon: '🍲', name: '燉湯砂鍋', desc: '慢火細燉' }
+        ];
+
+        const recipes = [
+            {
+                name: '魔幻麻婆豆腐',
+                hint: '六味一體：辣、香、色、燙、麻、酥',
+                required: ['tofu', 'meat', 'chili'],
+                tool: 'wok',
+                desc: '這就是六味一體的魔幻麻婆豆腐！口感與味道的極致平衡！'
+            },
+            {
+                name: '黃金炒飯',
+                hint: '米飯在蛋液中跳舞',
+                required: ['rice', 'egg', 'scallion'],
+                tool: 'wok',
+                desc: '每一粒米都被金黃色的雞蛋包裹著，彷彿在發光一樣！'
+            },
+            {
+                name: '昇龍餃子',
+                hint: '形狀如龍升天（蝦、麵皮、肉）',
+                required: ['shrimp', 'wrapper', 'meat'],
+                tool: 'steamer',
+                desc: '利用蝦肉與麵皮不同的膨脹係數，讓餃子站起來了！'
+            },
+            {
+                name: '烈冰鮮鯛山',
+                hint: '如刀劍般的生魚片（魚、醋、酒）',
+                required: ['fish', 'vinegar', 'wine'],
+                tool: 'knife', // Special case, mapped visually to something else or just added to tools? 
+                // Let's simplify and make it a "Simmered Fish" to fit existing tools or add Knife.
+                // Re-theming to "Steamed Fish Head" for simplicity with Steamer
+                name: '清蒸麒麟魚',
+                hint: '魚躍龍門，鮮味爆發（魚、蔥、酒）',
+                required: ['fish', 'scallion', 'wine'],
+                tool: 'steamer',
+                desc: '魚肉鮮嫩多汁，完美的火候控制！'
+            }
+        ];
+
+        // State
+        let currentRecipe = null;
+        let selectedIngredients = [];
+        let selectedTool = null;
+        let fireLevel = 0; 
+        let gameTimer = null;
+        let timeRemaining = 5.0;
+        let cookingScore = 0; 
+        let recipeIndex = 0;
+
+        // Helpers
+        const getEl = (id) => document.getElementById(id);
+        const hideAllScreens = () => {
+            ['screen-start', 'screen-ingredients', 'screen-tools', 'screen-cooking', 'screen-judgement'].forEach(id => {
+                getEl(id).classList.add('hidden');
+            });
+        };
+
+        // SFX
+        function playVisualSound(text) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            div.className = 'absolute text-4xl font-bold text-white pointer-events-none transition-all duration-500 z-50';
+            div.style.left = Math.random() * 80 + 10 + '%';
+            div.style.top = Math.random() * 80 + 10 + '%';
+            div.style.textShadow = '2px 2px 0 #000';
+            getEl('game-container').appendChild(div);
+            setTimeout(() => {
+                div.style.transform = 'scale(2) translateY(-50px)';
+                div.style.opacity = '0';
+            }, 50);
+            setTimeout(() => div.remove(), 600);
+        }
+
+        // --- Game Flow ---
+
+        // 1. Start
+        function startGame() {
+            hideAllScreens();
+            currentRecipe = recipes[recipeIndex % recipes.length];
+            setupIngredientsPhase();
+            getEl('screen-ingredients').classList.remove('hidden');
+        }
+
+        function setupIngredientsPhase() {
+            selectedIngredients = [];
+            updateSlots();
+            getEl('target-dish-name').innerText = currentRecipe.name;
+            getEl('dish-hint').innerText = '提示: ' + currentRecipe.hint;
+            
+            const grid = getEl('ingredient-grid');
+            grid.innerHTML = '';
+            
+            // Difficulty: Select 16 random ingredients or just use all 16 defined
+            // We have exactly 16 defined now, perfect for 4x4
+            const shuffled = [...ingredientsData].sort(() => Math.random() - 0.5);
+            
+            shuffled.forEach(ing => {
+                const btn = document.createElement('button');
+                btn.className = 'bg-red-900 border border-yellow-700 p-1 rounded hover:bg-red-800 flex flex-col items-center justify-center h-20 transition-transform active:scale-95';
+                btn.innerHTML = `<span class="text-2xl mb-1">${ing.icon}</span><span class="text-xs leading-none">${ing.name}</span>`;
+                btn.onclick = () => selectIngredient(ing);
+                grid.appendChild(btn);
+            });
+        }
+
+        function selectIngredient(ing) {
+            if (selectedIngredients.length < 3) {
+                if (!selectedIngredients.find(i => i.id === ing.id)) {
+                    selectedIngredients.push(ing);
+                    updateSlots();
+                }
+            }
+        }
+
+        function updateSlots() {
+            const slotsDiv = getEl('selected-slots');
+            const slots = slotsDiv.children;
+            
+            for (let i = 0; i < 3; i++) {
+                if (selectedIngredients[i]) {
+                    slots[i].innerText = selectedIngredients[i].icon;
+                    slots[i].classList.add('bg-yellow-900');
+                    slots[i].onclick = () => removeIngredient(i);
+                } else {
+                    slots[i].innerText = '';
+                    slots[i].classList.remove('bg-yellow-900');
+                    slots[i].onclick = null;
+                }
+            }
+
+            const btn = getEl('btn-to-tools');
+            if (selectedIngredients.length === 3) {
+                btn.disabled = false;
+                btn.classList.replace('bg-gray-600', 'bg-yellow-600');
+                btn.classList.replace('text-gray-300', 'text-red-900');
+                btn.classList.remove('cursor-not-allowed');
+            } else {
+                btn.disabled = true;
+                btn.classList.replace('bg-yellow-600', 'bg-gray-600');
+                btn.classList.replace('text-red-900', 'text-gray-300');
+                btn.classList.add('cursor-not-allowed');
+            }
+        }
+
+        function removeIngredient(index) {
+            selectedIngredients.splice(index, 1);
+            updateSlots();
+        }
+
+        function confirmIngredients() {
+            hideAllScreens();
+            setupToolPhase();
+            getEl('screen-tools').classList.remove('hidden');
+        }
+
+        // 2. Tool Phase
+        function setupToolPhase() {
+            selectedTool = null;
+            const grid = getEl('tools-grid');
+            grid.innerHTML = '';
+
+            toolsData.forEach(tool => {
+                const card = document.createElement('div');
+                card.className = 'tool-card bg-red-900/50 border-2 border-yellow-700 p-3 rounded cursor-pointer flex flex-col items-center hover:bg-red-800';
+                card.onclick = () => selectTool(tool.id, card);
+                card.innerHTML = `
+                    <span class="text-5xl mb-2">${tool.icon}</span>
+                    <span class="text-lg font-bold text-yellow-400">${tool.name}</span>
+                    <span class="text-xs text-gray-300">${tool.desc}</span>
+                `;
+                grid.appendChild(card);
+            });
+            updateToolBtn();
+        }
+
+        function selectTool(toolId, cardEl) {
+            selectedTool = toolId;
+            // Visual update
+            document.querySelectorAll('.tool-card').forEach(c => c.classList.remove('selected'));
+            cardEl.classList.add('selected');
+            updateToolBtn();
+        }
+
+        function updateToolBtn() {
+            const btn = getEl('btn-cook');
+            if (selectedTool) {
+                btn.disabled = false;
+                btn.classList.replace('bg-gray-600', 'bg-yellow-600');
+                btn.classList.replace('text-gray-300', 'text-red-900');
+                btn.classList.replace('cursor-not-allowed', 'shadow-[0_4px_0_rgb(120,50,0)]');
+                btn.classList.add('active:translate-y-1');
+            } else {
+                btn.disabled = true;
+                btn.classList.replace('bg-yellow-600', 'bg-gray-600');
+                btn.classList.replace('text-red-900', 'text-gray-300');
+                btn.classList.replace('shadow-[0_4px_0_rgb(120,50,0)]', 'shadow-[0_4px_0_rgb(50,50,50)]');
+                btn.classList.remove('active:translate-y-1');
+            }
+        }
+
+        function confirmTool() {
+            hideAllScreens();
+            setupCookingPhase();
+            getEl('screen-cooking').classList.remove('hidden');
+        }
+
+        // 3. Cooking Phase
+        function setupCookingPhase() {
+            fireLevel = 0;
+            timeRemaining = 5.0;
+            cookingScore = 0;
+            updateFireUI();
+            
+            // Set icon based on tool
+            const toolObj = toolsData.find(t => t.id === selectedTool);
+            getEl('cooking-icon').innerText = toolObj ? toolObj.icon : '🥘';
+
+            gameTimer = setInterval(() => {
+                timeRemaining -= 0.1;
+                getEl('time-remaining').innerText = timeRemaining.toFixed(2);
+                
+                fireLevel -= 2; 
+                if (fireLevel < 0) fireLevel = 0;
+                updateFireUI();
+
+                if (fireLevel >= 60 && fireLevel <= 80) {
+                    cookingScore += 2; 
+                    getEl('current-fire').style.boxShadow = "0 0 10px #fff";
+                } else {
+                    getEl('current-fire').style.boxShadow = "none";
+                }
+
+                if (timeRemaining <= 0) {
+                    endCooking();
+                }
+            }, 100);
+        }
+
+        function heatUp() {
+            fireLevel += 15;
+            if (fireLevel > 100) fireLevel = 100;
+            updateFireUI();
+            playVisualSound("🔥");
+            const fire = getEl('fire-effect');
+            fire.style.opacity = 1;
+            setTimeout(() => fire.style.opacity = 0, 200);
+        }
+
+        function updateFireUI() {
+            getEl('current-fire').style.width = fireLevel + '%';
+        }
+
+        function endCooking() {
+            clearInterval(gameTimer);
+            hideAllScreens();
+            setupJudgement();
+            getEl('screen-judgement').classList.remove('hidden');
+        }
+
+        // 4. Judgement
+        function setupJudgement() {
+            getEl('lid').classList.remove('translate-y-[-200px]', 'opacity-0');
+            getEl('lid').style.display = 'block';
+            getEl('dish-reveal').classList.add('hidden');
+            getEl('god-light').style.opacity = 0;
+        }
+
+        function revealDish() {
+            getEl('lid').classList.add('shake');
+            setTimeout(() => {
+                getEl('lid').style.transform = "translateY(-500px) rotate(45deg)";
+                getEl('lid').style.opacity = "0";
+                calculateScore();
+            }, 600);
+        }
+
+        function calculateScore() {
+            const selectedIds = selectedIngredients.map(i => i.id);
+            const requiredIds = currentRecipe.required;
+            const allIngredientsCorrect = requiredIds.every(id => selectedIds.includes(id));
+            const toolCorrect = (selectedTool === currentRecipe.tool);
+            
+            let finalGrade = '';
+            let title = '';
+            let isGolden = false;
+
+            // Logic Tree
+            if (!allIngredientsCorrect) {
+                // Wrong Ingredients
+                finalGrade = '劣';
+                title = '黑暗料理';
+                getEl('result-comment').innerText = "食材完全選錯了！這是給人吃的嗎？";
+            } else if (!toolCorrect) {
+                // Right Ingredients, Wrong Tool
+                finalGrade = '敗';
+                title = '功虧一簣';
+                const toolName = toolsData.find(t => t.id === selectedTool).name;
+                getEl('result-comment').innerText = `可惜啊！居然用${toolName}來做這道菜...口感全毀了！`;
+            } else {
+                // Correct Ingredients & Tool -> Check Fire
+                if (cookingScore > 80) {
+                    finalGrade = '特';
+                    title = '國士無雙';
+                    getEl('result-comment').innerText = currentRecipe.desc + " 完美的味道！";
+                    isGolden = true;
+                } else if (cookingScore > 50) {
+                    finalGrade = '良';
+                    title = '佳作';
+                    getEl('result-comment').innerText = "味道不錯，但火候還可以更精進。";
+                } else {
+                    finalGrade = '凡';
+                    title = '平平無奇';
+                    getEl('result-comment').innerText = "這道菜沒有靈魂，只是把東西煮熟而已。";
+                }
+            }
+
+            getEl('dish-reveal').classList.remove('hidden');
+            getEl('dish-reveal').classList.add('animate-fade-in');
+            getEl('result-title').innerText = title;
+            getEl('result-grade').innerText = finalGrade;
+            
+            if (isGolden) {
+                triggerGoldenEffect();
+            } else if (finalGrade === '劣' || finalGrade === '敗') {
+                getEl('game-container').style.filter = "grayscale(100%)";
+                playVisualSound("難吃...");
+            }
+        }
+
+        function triggerGoldenEffect() {
+            getEl('god-light').style.opacity = 1;
+            getEl('game-container').classList.add('shake');
+            const overlay = getEl('delicious-overlay');
+            const text = overlay.querySelector('h1');
+            overlay.classList.remove('hidden');
+            setTimeout(() => { text.style.transform = "scale(1)"; }, 100);
+            setTimeout(() => {
+                text.style.transform = "scale(0)";
+                overlay.classList.add('hidden');
+                getEl('game-container').classList.remove('shake');
+            }, 3000);
+        }
+
+        function resetGame() {
+            getEl('game-container').style.filter = "none";
+            getEl('god-light').style.opacity = 0;
+            getEl('lid').style.transform = "none";
+            getEl('lid').style.opacity = "1";
+            recipeIndex++;
+            startGame();
+        }
+    </script>
+</body>
+</html>

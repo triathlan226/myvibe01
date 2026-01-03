@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>極簡反應力挑戰 (Shape Match Focus)</title>
+    <style>
+        :root {
+            --color-bg: #505050;
+            --color-red: #FF4136;
+            --color-blue: #0074D9;
+            --color-yellow: #FFDC00;
+            --color-green: #2ECC40;
+            --font-main: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--color-bg);
+            color: white;
+            font-family: var(--font-main);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* UI Layer */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .stat-box {
+            font-size: 28px; /* 加大字體 */
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            background: rgba(0,0,0,0.3); /* 增加背景增加對比 */
+            padding: 5px 15px;
+            border-radius: 10px;
+        }
+
+        #hp-display {
+            color: #ff4d4d;
+        }
+
+        #task-prompt {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 22px; /* 加大提示字體 */
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 25px;
+            white-space: nowrap;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        #timer-bar-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 8px; /* 稍微加粗時間條 */
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        #timer-bar {
+            height: 100%;
+            background: white;
+            width: 100%;
+            transform-origin: left;
+            transition: transform 0.1s linear;
+        }
+
+        /* Canvas */
+        canvas {
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+            background-color: #505050;
+            border-radius: 8px;
+        }
+
+        /* Mobile Controls */
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            display: flex;
+            gap: 15px;
+            z-index: 20;
+        }
+
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            transition: transform 0.1s;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .control-btn:active {
+            transform: scale(0.9);
+        }
+
+        .btn-red {
+            background-color: var(--color-red);
+        }
+
+        .btn-blue {
+            background-color: var(--color-blue);
+        }
+
+        .btn-yellow {
+            background-color: var(--color-yellow);
+            color: #333;
+        }
+
+        .btn-green {
+            background-color: var(--color-green);
+        }
+
+        /* Screens (Start / Game Over) */
+        .overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-align: center;
+            background: linear-gradient(45deg, #FF4136, #0074D9, #FFDC00, #2ECC40);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .instructions {
+            margin: 20px 0;
+            text-align: left;
+            line-height: 1.6;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 400px;
+        }
+
+        .key-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin: 0 2px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-start {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 24px;
+            background: white;
+            color: #222;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-start:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.5);
+        }
+
+        /* Effects */
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-4px, 0, 0); }
+            20%, 80% { transform: translate3d(8px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .flash-red {
+            animation: flashRed 0.2s;
+        }
+
+        @keyframes flashRed {
+            0% { background-color: rgba(255, 0, 0, 0.3); }
+            100% { background-color: var(--color-bg); }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Timer Bar -->
+    <div id="timer-bar-container">
+        <div id="timer-bar"></div>
+    </div>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        <div class="stat-box" id="hp-display">❤️❤️❤️</div>
+        <div id="task-prompt">請點擊 <strong>[圓形]</strong> 的顏色</div>
+        <div class="stat-box" id="score-display">Score: 0</div>
+    </div>
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Mobile/Touch Controls -->
+    <div id="controls">
+        <div class="control-btn btn-red" data-color="red" onclick="game.handleInput('red')">
+            A
+        </div>
+        <div class="control-btn btn-blue" data-color="blue" onclick="game.handleInput('blue')">
+            S
+        </div>
+        <div class="control-btn btn-yellow" data-color="yellow" onclick="game.handleInput('yellow')">
+            D
+        </div>
+        <div class="control-btn btn-green" data-color="green" onclick="game.handleInput('green')">
+            F
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="overlay-screen">
+        <h1>極簡反應力挑戰</h1>
+        <div class="instructions">
+            <p><strong>目標：</strong>快速找出畫面中的 <span style="color:white; border-bottom: 2px solid white;">圓形</span>
+                並按下對應顏色按鍵。</p>
+            <p><strong>注意：</strong>忽略三角形！那是干擾項。</p>
+            <p><strong>按鍵操作：</strong></p>
+            <p><span class="key-badge" style="background:var(--color-red)">A</span> = 紅色</p>
+            <p><span class="key-badge" style="background:var(--color-blue)">S</span> = 藍色</p>
+            <p><span class="key-badge" style="background:var(--color-yellow); color:#333">D</span> = 黃色</p>
+            <p><span class="key-badge" style="background:var(--color-green)">F</span> = 綠色</p>
+        </div>
+        <button class="btn-start" onclick="game.start()">開始遊戲</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="overlay-screen hidden">
+        <h1 style="font-size: 36px;">遊戲結束</h1>
+        <p style="font-size: 24px; margin: 10px 0;">最終得分</p>
+        <div id="final-score" style="font-size: 64px; font-weight: bold; color: white;">0</div>
+        <button class="btn-start" onclick="game.reset()">重新開始</button>
+    </div>
+
+    <script>
+        // Game Constants & Configuration
+        const COLORS = {
+            red: '#FF4136',
+            blue: '#0074D9',
+            yellow: '#FFDC00',
+            green: '#2ECC40'
+        };
+        const COLOR_KEYS = Object.keys(COLORS);
+        const KEY_MAP = {
+            'a': 'red', 'A': 'red',
+            's': 'blue', 'S': 'blue',
+            'd': 'yellow', 'D': 'yellow',
+            'f': 'green', 'F': 'green'
+        };
+
+        const CANVAS_SIZE = 600; // Internal resolution
+        const SHAPE_SIZE = 60;
+
+        class Shape {
+            constructor(type, color, x, y) {
+                this.type = type; // 'circle' or 'triangle'
+                this.color = color;
+                this.colorHex = COLORS[color];
+                this.x = x;
+                this.y = y;
+                this.size = SHAPE_SIZE;
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = this.colorHex;
+                ctx.beginPath();
+                if (this.type === 'circle') {
+                    ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+                } else if (this.type === 'triangle') {
+                    // Draw equilateral triangle centered at x, y
+                    const h = (Math.sqrt(3) / 2) * this.size;
+                    ctx.moveTo(this.x, this.y - h / 2);
+                    ctx.lineTo(this.x - this.size / 2, this.y + h / 2);
+                    ctx.lineTo(this.x + this.size / 2, this.y + h / 2);
+                }
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resizeCanvas();
+                
+                // UI Elements
+                this.hpDisplay = document.getElementById('hp-display');
+                this.scoreDisplay = document.getElementById('score-display');
+                this.timerBar = document.getElementById('timer-bar');
+                this.startScreen = document.getElementById('start-screen');
+                this.gameOverScreen = document.getElementById('game-over-screen');
+                this.finalScoreDisplay = document.getElementById('final-score');
+                this.body = document.body;
+
+                // Game State
+                this.isPlaying = false;
+                this.score = 0;
+                this.hp = 3;
+                this.maxTime = 2000; // ms
+                this.currentTime = 0;
+                this.lastFrameTime = 0;
+                
+                this.shapes = [];
+                this.targetColor = null;
+
+                // Bind events
+                window.addEventListener('resize', () => this.resizeCanvas());
+                window.addEventListener('keydown', (e) => this.onKeyDown(e));
+                
+                // Animation loop binding
+                this.loop = this.loop.bind(this);
+                requestAnimationFrame(this.loop);
+            }
+
+            resizeCanvas() {
+                // Maintain aspect ratio but fit within screen
+                const margin = 40;
+                const uiHeight = 150; // approximate
+                const maxWidth = window.innerWidth - margin;
+                const maxHeight = window.innerHeight - uiHeight - margin;
+                
+                let size = Math.min(maxWidth, maxHeight, 600);
+                
+                this.canvas.width = size;
+                this.canvas.height = size;
+                
+                // Scale factor for drawing logic
+                this.scale = size / CANVAS_SIZE; 
+            }
+
+            start() {
+                this.score = 0;
+                this.hp = 3;
+                this.maxTime = 2000;
+                this.isPlaying = true;
+                this.updateUI();
+                this.startScreen.classList.add('hidden');
+                this.gameOverScreen.classList.add('hidden');
+                this.nextRound();
+                this.lastFrameTime = performance.now();
+            }
+
+            reset() {
+                this.start();
+            }
+
+            gameOver() {
+                this.isPlaying = false;
+                this.finalScoreDisplay.textContent = this.score;
+                this.gameOverScreen.classList.remove('hidden');
+                this.playSound('fail');
+            }
+
+            nextRound() {
+                this.shapes = [];
+                this.currentTime = this.maxTime;
+                
+                // Difficulty Scaling
+                // Decrease time by 0.1s (100ms) every 50 points
+                // Minimum reaction time floor: 800ms
+                const speedUp = Math.floor(this.score / 50) * 100;
+                this.maxTime = Math.max(800, 2000 - speedUp);
+
+                // Determine colors
+                const targetColorKey = this.getRandomColor();
+                this.targetColor = targetColorKey;
+
+                // 1 Circle (Target)
+                const circlePos = this.getRandomPosition();
+                this.shapes.push(new Shape('circle', targetColorKey, circlePos.x, circlePos.y));
+
+                // 2-5 Triangles (Distractors) - Increased from 1-2
+                // Random number between 3 and 5 (inclusive)
+                const numDistractors = Math.floor(Math.random() * 3) + 3;
+                
+                for (let i = 0; i < numDistractors; i++) {
+                    let validPos = false;
+                    let pos;
+                    let attempts = 0;
+                    // Prevent overlapping
+                    while (!validPos && attempts < 50) {
+                        pos = this.getRandomPosition();
+                        validPos = true;
+                        for (let s of this.shapes) {
+                            const dist = Math.hypot(s.x - pos.x, s.y - pos.y);
+                            if (dist < SHAPE_SIZE * 1.5) {
+                                validPos = false;
+                                break;
+                            }
+                        }
+                        attempts++;
+                    }
+                    if(validPos) {
+                        this.shapes.push(new Shape('triangle', this.getRandomColor(), pos.x, pos.y));
+                    }
+                }
+            }
+
+            getRandomColor() {
+                return COLOR_KEYS[Math.floor(Math.random() * COLOR_KEYS.length)];
+            }
+
+            getRandomPosition() {
+                // Keep within bounds (virtual size 600)
+                const padding = SHAPE_SIZE;
+                return {
+                    x: padding + Math.random() * (CANVAS_SIZE - padding * 2),
+                    y: padding + Math.random() * (CANVAS_SIZE - padding * 2)
+                };
+            }
+
+            handleInput(colorInput) {
+                if (!this.isPlaying) return;
+
+                if (colorInput === this.targetColor) {
+                    // Correct
+                    this.score += 10;
+                    this.playSound('success');
+                    this.nextRound();
+                } else {
+                    // Wrong
+                    this.takeDamage();
+                }
+                this.updateUI();
+            }
+
+            onKeyDown(e) {
+                if (!this.isPlaying) return;
+                const mappedColor = KEY_MAP[e.key];
+                if (mappedColor) {
+                    // Add visual feedback to button
+                    const btn = document.querySelector(`.btn-${mappedColor}`);
+                    if(btn) {
+                        btn.style.transform = "scale(0.9)";
+                        setTimeout(() => btn.style.transform = "scale(1)", 100);
+                    }
+                    this.handleInput(mappedColor);
+                }
+            }
+
+            takeDamage() {
+                this.hp--;
+                this.updateUI(); // Fix: Update UI immediately when damage taken
+                this.playSound('hurt');
+                this.body.classList.add('shake');
+                this.body.classList.add('flash-red');
+                setTimeout(() => {
+                    this.body.classList.remove('shake');
+                    this.body.classList.remove('flash-red');
+                }, 400);
+
+                if (this.hp <= 0) {
+                    this.gameOver();
+                } else {
+                    this.nextRound();
+                }
+            }
+
+            update(dt) {
+                if (!this.isPlaying) return;
+
+                this.currentTime -= dt;
+                
+                // Update timer bar visuals
+                const pct = Math.max(0, this.currentTime / this.maxTime);
+                this.timerBar.style.transform = `scaleX(${pct})`;
+
+                if (this.currentTime <= 0) {
+                    this.takeDamage();
+                }
+            }
+
+            draw() {
+                // Clear Canvas
+                this.ctx.fillStyle = '#505050'; 
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (!this.isPlaying) return;
+
+                this.ctx.save();
+                this.ctx.scale(this.scale, this.scale);
+
+                // Draw Shapes
+                this.shapes.forEach(shape => shape.draw(this.ctx));
+
+                this.ctx.restore();
+            }
+
+            loop(timestamp) {
+                const dt = timestamp - this.lastFrameTime;
+                this.lastFrameTime = timestamp;
+
+                this.update(dt);
+                this.draw();
+                requestAnimationFrame(this.loop);
+            }
+
+            updateUI() {
+                let hearts = '';
+                for(let i=0; i<this.hp; i++) hearts += '❤️';
+                this.hpDisplay.textContent = hearts;
+                this.scoreDisplay.textContent = `Score: ${this.score}`;
+            }
+
+            playSound(type) {
+                // Simple Audio Synthesis to avoid external assets
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'success') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(500, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.1);
+                } else if (type === 'fail' || type === 'hurt') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.3);
+                }
+            }
+        }
+
+        // Initialize
+        const game = new Game();
+
+    </script>
+</body>
+
+</html>

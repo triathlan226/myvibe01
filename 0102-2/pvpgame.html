@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bandit Trap Fighter - 像素陷阱格鬥</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0f1a;
+            color: white;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+        canvas {
+            background-color: black;
+            border: 8px solid #1f2937;
+            border-radius: 0.75rem;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            max-width: 100%;
+            height: auto;
+        }
+        .skew-btn {
+            transform: skewX(-10deg);
+            transition: all 0.2s;
+        }
+        .skew-btn:hover {
+            transform: skewX(-10deg) scale(1.05);
+        }
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(10, 15, 26, 0.95);
+            backdrop-filter: blur(4px);
+            z-index: 50;
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- UI Header -->
+    <div class="mb-6 text-center">
+        <h1 class="text-5xl font-black tracking-tighter italic mb-2 bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-500">
+            BANDIT TRAP
+        </h1>
+        <div class="flex gap-12 justify-center items-center">
+            <div class="flex flex-col text-blue-400">
+                <span class="text-xs font-bold uppercase tracking-widest">P1 Kills</span>
+                <span id="p1Score" class="text-3xl font-black">0</span>
+            </div>
+            <div class="bg-white/10 px-6 py-2 rounded-full border border-white/20">
+                <span id="timerDisplay" class="text-2xl font-mono text-yellow-400">120s</span>
+            </div>
+            <div class="flex flex-col text-red-400">
+                <span class="text-xs font-bold uppercase tracking-widest">P2 Kills</span>
+                <span id="p2Score" class="text-3xl font-black">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Container -->
+    <div class="relative">
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+        <!-- Start Menu -->
+        <div id="startMenu" class="overlay">
+            <div class="mb-12 text-center">
+                <div class="text-6xl font-black italic tracking-tighter uppercase">Rip or Survive</div>
+                <div class="h-1 bg-yellow-500 w-full mt-2"></div>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="startGame()" class="skew-btn bg-white text-black font-black px-12 py-4 text-2xl hover:bg-yellow-400">PLAY GAME</button>
+                <button onclick="toggleSettings(true)" class="skew-btn border-2 border-white text-white font-black px-12 py-4 text-2xl hover:bg-white hover:text-black">SETTINGS</button>
+            </div>
+        </div>
+
+        <!-- Settings Menu -->
+        <div id="settingsMenu" class="overlay hidden overflow-y-auto p-6">
+            <h2 class="text-3xl font-black mb-6 italic">CONTROL SETTINGS</h2>
+            <div class="grid grid-cols-2 gap-8 w-full max-w-2xl mb-8">
+                <!-- P1 Config -->
+                <div class="bg-white/5 p-4 rounded-lg">
+                    <h3 class="text-blue-400 font-bold mb-3 text-center border-b border-white/10 pb-2 uppercase text-xs tracking-widest">Player 1</h3>
+                    <div id="p1-binding-container"></div>
+                </div>
+                <!-- P2 Config -->
+                <div class="bg-white/5 p-4 rounded-lg">
+                    <h3 class="text-red-400 font-bold mb-3 text-center border-b border-white/10 pb-2 uppercase text-xs tracking-widest">Player 2</h3>
+                    <div id="p2-binding-container"></div>
+                </div>
+            </div>
+            <button onclick="toggleSettings(false)" class="bg-yellow-500 text-black font-black px-12 py-3 rounded uppercase tracking-widest hover:bg-yellow-400">SAVE & BACK</button>
+        </div>
+
+        <!-- End Menu -->
+        <div id="endMenu" class="overlay hidden">
+            <h2 class="text-7xl font-black italic mb-2 tracking-tighter">MATCH OVER</h2>
+            <div id="winnerText" class="text-3xl font-bold mb-12 text-yellow-500 uppercase"></div>
+            <div class="flex gap-4">
+                <button onclick="startGame()" class="bg-white text-black font-black px-10 py-4 text-xl hover:bg-yellow-400 transition-all">REMATCH</button>
+                <button onclick="backToMenu()" class="border-2 border-white text-white font-black px-10 py-4 text-xl hover:bg-white hover:text-black transition-all">MAIN MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Info -->
+    <div class="mt-8 grid grid-cols-2 gap-x-12 gap-y-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest max-w-2xl text-center">
+        <div>DASH: Press Dash key to speed up and PASS THROUGH opponents</div>
+        <div>GUARD: Hold [Guard] + [Direction] to block attacks from opposite side</div>
+        <div class="col-span-2 text-yellow-600 mt-2 italic">DASH THROUGH AN ENEMY TO ATTACK FROM THEIR UNGUARDED BACK!</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const WIDTH = 800;
+        const HEIGHT = 500;
+        const GROUND_Y = 450;
+        const GRAVITY = 0.6;
+
+        let gameState = 'START';
+        let timer = 120;
+        let scores = { p1: 0, p2: 0 };
+        let timerInterval;
+
+        let keyConfigs = {
+            p1: { up: 'KeyW', left: 'KeyA', down: 'KeyS', right: 'KeyD', attack: 'KeyE', dash: 'KeyQ', guard: 'KeyZ', shoot: 'KeyF' },
+            p2: { up: 'ArrowUp', left: 'ArrowLeft', down: 'ArrowDown', right: 'ArrowRight', attack: 'KeyK', dash: 'KeyL', guard: 'KeyJ', shoot: 'KeyP' }
+        };
+
+        const keyLabels = {
+            up: '跳躍 / 向上',
+            left: '向左移動',
+            right: '向右移動',
+            attack: '近戰攻擊',
+            dash: '衝刺穿越',
+            guard: '防禦',
+            shoot: '射擊武器'
+        };
+
+        let activeKeys = {};
+        let bindingState = null; // { player, action }
+
+        const players = [];
+        let bullets = [];
+        let traps = [];
+        let walls = [];
+        let frameCount = 0;
+        let nextWallTime = 15;
+
+        // --- 初始化與設定 ---
+
+        function setupBindingUI() {
+            ['p1', 'p2'].forEach(p => {
+                const container = document.getElementById(`${p}-binding-container`);
+                container.innerHTML = '';
+                Object.keys(keyConfigs[p]).forEach(action => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center justify-between bg-slate-800 p-2 rounded mb-1';
+                    row.innerHTML = `
+                        <span class="text-[10px] uppercase font-bold">${keyLabels[action] || action}</span>
+                        <button onclick="startBinding('${p}', '${action}')" id="btn-${p}-${action}" class="px-3 py-1 rounded text-[10px] min-w-[80px] bg-slate-700 hover:bg-slate-600 font-mono">
+                            ${keyConfigs[p][action]}
+                        </button>
+                    `;
+                    container.appendChild(row);
+                });
+            });
+        }
+
+        function startBinding(player, action) {
+            bindingState = { player, action };
+            const btn = document.getElementById(`btn-${player}-${action}`);
+            btn.innerText = 'PRESS KEY...';
+            btn.classList.add('bg-yellow-500', 'text-black', 'animate-pulse');
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (bindingState) {
+                keyConfigs[bindingState.player][bindingState.action] = e.code;
+                bindingState = null;
+                setupBindingUI();
+                e.preventDefault();
+                return;
+            }
+            activeKeys[e.code] = true;
+        });
+
+        window.addEventListener('keyup', (e) => activeKeys[e.code] = false);
+
+        function toggleSettings(show) {
+            document.getElementById('settingsMenu').classList.toggle('hidden', !show);
+            document.getElementById('startMenu').classList.toggle('hidden', show);
+            if(show) setupBindingUI();
+        }
+
+        function backToMenu() {
+            gameState = 'START';
+            document.getElementById('endMenu').classList.add('hidden');
+            document.getElementById('startMenu').classList.remove('hidden');
+        }
+
+        // --- 遊戲邏輯 ---
+
+        function startGame() {
+            gameState = 'PLAYING';
+            timer = 120;
+            scores = { p1: 0, p2: 0 };
+            bullets = [];
+            traps = [];
+            walls = [];
+            nextWallTime = 15;
+            frameCount = 0;
+
+            players[0] = createPlayer(1, 150, '#3b82f6', '#60a5fa');
+            players[1] = createPlayer(2, 620, '#ef4444', '#f87171');
+
+            document.getElementById('startMenu').classList.add('hidden');
+            document.getElementById('endMenu').classList.add('hidden');
+            document.getElementById('p1Score').innerText = '0';
+            document.getElementById('p2Score').innerText = '0';
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timer--;
+                document.getElementById('timerDisplay').innerText = timer + 's';
+                if (timer <= 0) endGame();
+            }, 1000);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function createPlayer(id, x, color, skin) {
+            return {
+                id, x, y: GROUND_Y - 50, w: 30, h: 50, vx: 0, vy: 0, speed: 5,
+                hp: 150, stamina: 100, jumps: 0, lastDash: 0,
+                weapon: null, ammo: 0, color, skin,
+                isStunned: 0, direction: id === 1 ? 1 : -1, lastAttack: 0,
+                guardDir: 0, bob: 0, lastShoot: 0, isDashing: 0, jumpPressed: false
+            };
+        }
+
+        function endGame() {
+            gameState = 'END';
+            clearInterval(timerInterval);
+            document.getElementById('endMenu').classList.remove('hidden');
+            const winner = scores.p1 > scores.p2 ? 'PLAYER 1 WINS' : scores.p2 > scores.p1 ? 'PLAYER 2 WINS' : 'DRAW';
+            document.getElementById('winnerText').innerText = winner;
+        }
+
+        function assignWeapon(p) {
+            const types = [{ dmg: 25, ammo: 8 }, { dmg: 40, ammo: 4 }];
+            p.weapon = types[Math.floor(Math.random() * types.length)];
+            p.ammo = p.weapon.ammo;
+        }
+
+        function gameLoop() {
+            if (gameState !== 'PLAYING') return;
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update() {
+            frameCount++;
+            const now = Date.now();
+
+            // 武器分配
+            players.forEach(p => {
+                if (!p.weapon && p.ammo === 0 && ((timer <= 120 && timer > 30) || timer <= 45)) {
+                    if (Math.random() < 0.01) assignWeapon(p);
+                }
+            });
+
+            // 陷阱生成
+            if (Math.random() < 0.005 && traps.length < 2) {
+                traps.push({
+                    type: Math.random() < 0.5 ? 'HOLE' : 'STUN',
+                    x: Math.random() * (WIDTH - 150) + 75,
+                    y: GROUND_Y - 5,
+                    warning: 120, active: false, duration: 180
+                });
+            }
+
+            // 牆壁生成
+            if (120 - timer >= nextWallTime) {
+                walls.push({ x: WIDTH / 2 - 10, y: GROUND_Y - 140, w: 20, h: 140, life: 300 });
+                nextWallTime += 15;
+            }
+
+            traps = traps.filter(t => {
+                if (t.warning > 0) { t.warning--; if (t.warning === 0) t.active = true; return true; }
+                t.duration--; return t.duration > 0;
+            });
+            walls = walls.filter(w => { w.life--; return w.life > 0; });
+
+            // 玩家處理
+            players.forEach((p, idx) => {
+                if (p.isStunned > 0) { p.isStunned--; return; }
+
+                const config = p.id === 1 ? keyConfigs.p1 : keyConfigs.p2;
+                
+                // 防禦判定 (按住防禦 + 方向)
+                if (activeKeys[config.guard]) {
+                    if (activeKeys[config.left]) p.guardDir = 1; // 按左防右
+                    else if (activeKeys[config.right]) p.guardDir = -1; // 按右防左
+                    else p.guardDir = 0;
+                } else {
+                    p.guardDir = 0;
+                }
+
+                if (p.isDashing > 0) p.isDashing--;
+
+                if (p.guardDir === 0) {
+                    // 移動
+                    if (activeKeys[config.left]) { p.vx = -p.speed; p.direction = -1; }
+                    else if (activeKeys[config.right]) { p.vx = p.speed; p.direction = 1; }
+                    else { p.vx *= 0.8; }
+
+                    // 跳躍
+                    if (activeKeys[config.up] && !p.jumpPressed) {
+                        if (p.jumps < 2 && p.stamina >= 10) {
+                            p.vy = -12; p.jumps++;
+                            p.stamina -= (p.jumps === 2 ? 10 : 0);
+                        }
+                        p.jumpPressed = true;
+                    }
+                    if (!activeKeys[config.up]) p.jumpPressed = false;
+
+                    // 衝刺
+                    if (activeKeys[config.dash] && p.stamina >= 15 && now - p.lastDash > 600) {
+                        p.vx = p.direction * 18;
+                        p.stamina -= 15;
+                        p.lastDash = now;
+                        p.isDashing = 15;
+                    }
+
+                    // 攻擊
+                    if (activeKeys[config.attack] && now - p.lastAttack > 400) {
+                        const other = players[1 - idx];
+                        const dist = Math.abs((p.x + p.w / 2) - (other.x + other.w / 2));
+                        if (dist < 65 && Math.abs(p.y - other.y) < 50) {
+                            const attackerFromRight = (p.x > other.x);
+                            const blocked = (attackerFromRight && other.guardDir === 1) || (!attackerFromRight && other.guardDir === -1);
+                            if (!blocked) other.hp -= 65;
+                        }
+                        p.lastAttack = now;
+                    }
+
+                    // 射擊
+                    if (activeKeys[config.shoot] && p.weapon && p.ammo > 0 && now - p.lastShoot > 300) {
+                        bullets.push({ x: p.x + p.w / 2, y: p.y + p.h / 3, vx: p.direction * 12, damage: p.weapon.dmg, owner: p.id });
+                        p.ammo--; p.lastShoot = now;
+                        if (p.ammo <= 0) p.weapon = null;
+                    }
+                } else {
+                    p.vx *= 0.5;
+                }
+
+                p.vy += GRAVITY;
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.y > GROUND_Y - p.h) { p.y = GROUND_Y - p.h; p.vy = 0; p.jumps = 0; }
+                
+                // 牆壁碰撞
+                walls.forEach(w => {
+                    if (p.x + p.w > w.x && p.x < w.x + w.w && p.y + p.h > w.y) {
+                        if (p.vx > 0 && p.x < w.x) p.x = w.x - p.w;
+                        if (p.vx < 0 && p.x > w.x) p.x = w.x + w.w;
+                    }
+                });
+
+                // 玩家間碰撞與穿越
+                const other = players[1 - idx];
+                const isOverlapping = p.x + p.w > other.x && p.x < other.x + other.w && p.y + p.h > other.y && p.y < other.y + other.h;
+                if (isOverlapping) {
+                    if (p.isDashing <= 0) {
+                        if (p.x < other.x) p.x = other.x - p.w;
+                        else p.x = other.x + other.w;
+                    }
+                }
+
+                if (p.x < 0) p.x = 0; if (p.x > WIDTH - p.w) p.x = WIDTH - p.w;
+
+                // 陷阱碰撞
+                traps.forEach(t => {
+                    if (t.active && Math.abs(p.x + p.w/2 - t.x) < 30 && p.y > GROUND_Y - 50) {
+                        if (t.type === 'HOLE') { p.hp -= 30; p.y = GROUND_Y - 200; p.vy = -5; }
+                        else if (t.type === 'STUN') { p.isStunned = 120; }
+                    }
+                });
+
+                if (!activeKeys[config.left] && !activeKeys[config.right] && p.vy === 0) {
+                    p.stamina = Math.min(100, p.stamina + 0.6);
+                }
+
+                p.bob = Math.sin(frameCount * 0.1) * 2;
+
+                if (p.hp <= 0) {
+                    if (p.id === 1) { scores.p2++; document.getElementById('p2Score').innerText = scores.p2; }
+                    else { scores.p1++; document.getElementById('p1Score').innerText = scores.p1; }
+                    p.hp = 150; p.stamina = 100; p.x = p.id === 1 ? 150 : 620; p.y = GROUND_Y - 50;
+                }
+            });
+
+            // 子彈更新
+            bullets = bullets.filter(b => {
+                b.x += b.vx;
+                let hit = false;
+                players.forEach(p => {
+                    if (p.id !== b.owner && b.x > p.x && b.x < p.x + p.w && b.y > p.y && b.y < p.y + p.h) {
+                        const bulletFromRight = b.vx < 0;
+                        const blocked = (bulletFromRight && p.guardDir === 1) || (!bulletFromRight && p.guardDir === -1);
+                        if (!blocked) p.hp -= b.damage;
+                        hit = true;
+                    }
+                });
+                return !hit && b.x > 0 && b.x < WIDTH;
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+            
+            // 背景格線
+            ctx.fillStyle = '#111827'; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 1;
+            for(let i=0; i<WIDTH; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,HEIGHT); ctx.stroke(); }
+            for(let i=0; i<HEIGHT; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(WIDTH,i); ctx.stroke(); }
+
+            // 地面
+            ctx.fillStyle = '#374151'; ctx.fillRect(0, GROUND_Y, WIDTH, HEIGHT - GROUND_Y);
+
+            // 陷阱
+            traps.forEach(t => {
+                if (t.warning > 0 && Math.floor(t.warning / 10) % 2 === 0) {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.4)'; ctx.fillRect(t.x - 30, GROUND_Y - 4, 60, 8);
+                } else if (t.active) {
+                    ctx.fillStyle = t.type === 'HOLE' ? '#000' : '#fbbf24'; ctx.fillRect(t.x - 30, GROUND_Y - 4, 60, 8);
+                }
+            });
+
+            // 牆壁
+            walls.forEach(w => { ctx.fillStyle = '#4b5563'; ctx.fillRect(w.x, w.y, w.w, w.h); });
+
+            // 玩家
+            players.forEach(p => {
+                ctx.save();
+                ctx.translate(p.x + p.w / 2, p.y + p.h / 2 + p.bob);
+                
+                // 衝刺殘影
+                if (p.isDashing > 0) {
+                    ctx.globalAlpha = 0.4; ctx.fillStyle = '#fff';
+                    ctx.beginPath(); roundRect(ctx, -22 * p.direction, -10, 24, 30, 8); ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // 身體
+                ctx.fillStyle = p.guardDir !== 0 ? '#1e293b' : p.color;
+                ctx.beginPath(); roundRect(ctx, -12, -10, 24, 30, 8); ctx.fill();
+
+                // 頭部
+                ctx.fillStyle = p.isStunned > 0 ? '#9ca3af' : p.skin;
+                ctx.beginPath(); ctx.arc(0, -22, 14, 0, Math.PI * 2); ctx.fill();
+
+                // 眼睛
+                ctx.fillStyle = 'white';
+                ctx.fillRect(p.direction * 4, -25, 4, 4);
+                ctx.fillRect(p.direction * 9, -25, 4, 4);
+
+                // 防禦盾牆
+                if (p.guardDir !== 0) {
+                    ctx.lineWidth = 4; ctx.strokeStyle = '#60a5fa';
+                    ctx.beginPath();
+                    const shieldX = p.guardDir * 25;
+                    ctx.moveTo(shieldX, -30); ctx.lineTo(shieldX, 20); ctx.stroke();
+                    ctx.strokeStyle = 'rgba(96, 165, 250, 0.3)'; ctx.lineWidth = 10; ctx.stroke();
+                }
+
+                ctx.restore();
+                
+                // UI (血量與能量)
+                const uiX = p.x - 10;
+                ctx.fillStyle = '#000'; ctx.fillRect(uiX, p.y - 25, 50, 6);
+                ctx.fillStyle = '#ef4444'; ctx.fillRect(uiX, p.y - 25, (p.hp / 150) * 50, 6);
+                ctx.fillStyle = '#3b82f6'; ctx.fillRect(uiX, p.y - 17, (p.stamina / 100) * 50, 3);
+            });
+
+            // 子彈
+            bullets.forEach(b => {
+                ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill();
+            });
+        }
+
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+    </script>
+</body>
+</html>

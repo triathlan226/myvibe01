@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宮闈殘局——鳳凰浴火錄 (最終修復版)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+
+        :root {
+            --royal-red: #8B0000;
+            --royal-gold: #DAA520;
+            --paper-bg: #F5F5DC;
+            --ink-black: #2F2F2F;
+            --faded-border: #D2B48C;
+            --item-bg: #e8dcc5;
+        }
+
+        /* 全局重置 */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
+            background-color: #2a2a2a;
+            background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23333" fill-opacity="0.1"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: var(--ink-black);
+            overflow: hidden; 
+        }
+
+        /* 遊戲主容器 */
+        .game-container {
+            width: 100%;
+            max-width: 800px;
+            height: 98vh;
+            background-color: var(--paper-bg);
+            background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+            border: 8px solid var(--royal-red);
+            border-radius: 4px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-container::before {
+            content: "";
+            position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border: 2px solid var(--royal-gold);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* 頂部屬性欄 */
+        .stats-bar {
+            background: linear-gradient(to bottom, #4a0000, #2b0000);
+            color: #fff;
+            padding: 8px;
+            border-bottom: 2px solid var(--royal-gold);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            z-index: 20;
+            flex-shrink: 0;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            padding: 3px 6px;
+            min-width: 55px;
+        }
+
+        .stat-label { color: #ccc; font-size: 0.65rem; margin-bottom: 2px; }
+        .stat-value { font-weight: bold; color: var(--royal-gold); font-family: monospace; }
+
+        /* 道具欄 */
+        .inventory-bar {
+            background: #d4c5a9;
+            padding: 5px 15px;
+            border-bottom: 1px solid var(--faded-border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            z-index: 18;
+            min-height: 36px;
+        }
+        
+        .inv-label { font-weight: bold; color: var(--royal-red); margin-right: 5px; }
+        .inv-item {
+            background: #fff;
+            border: 1px solid #8c7b70;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            color: #4a3b32;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        /* 劇情區 */
+        .story-area {
+            flex: 1;
+            min-height: 0; /* 關鍵：讓 flex item 可以縮小 */
+            padding: 20px 30px;
+            overflow-y: auto;
+            font-size: 1.1rem;
+            line-height: 1.8;
+            text-align: justify;
+            z-index: 15;
+            position: relative;
+        }
+
+        .story-area::-webkit-scrollbar { width: 8px; }
+        .story-area::-webkit-scrollbar-thumb { background: var(--faded-border); border-radius: 4px; }
+        .story-area::-webkit-scrollbar-thumb:hover { background: var(--royal-gold); }
+
+        .highlight-danger { color: #991b1b; font-weight: bold; }
+        .highlight-success { color: #2e7d32; font-weight: bold; }
+
+        .event-log {
+            font-size: 0.95rem;
+            color: #555;
+            margin: 15px 0;
+            font-style: italic;
+            border-left: 3px solid var(--royal-gold);
+            padding-left: 12px;
+            background: rgba(218, 165, 32, 0.1);
+            padding: 8px 12px;
+            border-radius: 0 4px 4px 0;
+            animation: fadeIn 0.5s;
+        }
+
+        .npc-tag {
+            font-weight: bold;
+            color: var(--royal-red);
+            margin-right: 3px;
+            background: rgba(139, 0, 0, 0.05);
+            padding: 0 4px;
+            border-radius: 3px;
+        }
+
+        /* 選項區 - 關鍵修復：限制高度與捲動 */
+        .choices-area {
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-top: 1px solid var(--faded-border);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 20;
+            flex-shrink: 0; /* 防止被擠壓 */
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+            
+            /* 新增：防止按鈕過多時撐破畫面 */
+            max-height: 45vh; 
+            overflow-y: auto;
+        }
+        
+        /* 選項區捲軸樣式 */
+        .choices-area::-webkit-scrollbar { width: 6px; }
+        .choices-area::-webkit-scrollbar-track { background: transparent; }
+        .choices-area::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+        .choice-btn {
+            background: linear-gradient(to bottom, #fffdf5, #efe8d8);
+            border: 2px solid #8c7b70;
+            color: #4a3b32;
+            padding: 10px 14px;
+            text-align: left;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            font-family: 'Noto Serif TC', serif;
+            font-weight: bold;
+            font-size: 0.95rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0; /* 按鈕本身不壓縮 */
+        }
+        
+        .choice-btn-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .choice-btn:hover:not(:disabled) {
+            background: #fff;
+            border-color: var(--royal-red);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(139, 0, 0, 0.2);
+        }
+
+        .choice-btn:disabled {
+            background: #e0e0e0;
+            border-color: #ccc;
+            color: #999;
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+
+        .choice-req { font-size: 0.8rem; color: var(--royal-red); font-weight: normal; }
+        .choice-effect { font-size: 0.75rem; color: #666; margin-top: 4px; font-weight: normal; }
+        
+        .req-item { color: #8B4513; font-weight: bold; font-size: 0.8rem; }
+
+        .float-text {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.2rem;
+            pointer-events: none;
+            animation: floatUp 1.5s forwards;
+            z-index: 100;
+            text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 標題畫面 */
+        .title-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--royal-red);
+            background-image: url('data:image/svg+xml,%3Csvg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="%239c0000" fill-opacity="0.4" fill-rule="evenodd"%3E%3Ccircle cx="3" cy="3" r="3"/%3E%3Ccircle cx="13" cy="13" r="3"/%3E%3C/g%3E%3C/svg%3E');
+            z-index: 50;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: var(--royal-gold); text-align: center; padding: 20px;
+        }
+        
+        .title-main {
+            font-size: 2.5rem; font-weight: bold; margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            border: 4px double var(--royal-gold); padding: 20px 40px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        .start-btn {
+            padding: 15px 40px; font-size: 1.2rem; background: var(--royal-gold);
+            color: var(--royal-red); border: 2px solid #fff; cursor: pointer;
+            font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: transform 0.2s; margin-top: 20px;
+        }
+        .start-btn:hover { transform: scale(1.05); }
+        .hidden { display: none !important; }
+
+        /* RWD */
+        @media (max-width: 600px) {
+            .stats-bar { gap: 4px; padding: 5px; }
+            .stat-item { padding: 2px 4px; min-width: 45px; }
+            .stat-label { font-size: 0.6rem; }
+            .stat-value { font-size: 0.75rem; }
+            .game-container { height: 100vh; max-height: 100vh; border-width: 0; border-top: 5px solid var(--royal-red); border-radius: 0; }
+            .choices-area { padding: 10px 15px; max-height: 50vh; }
+            .inventory-bar { padding: 5px 10px; font-size: 0.75rem; min-height: 30px; overflow-x: auto; white-space: nowrap; }
+        }
+        
+        .val-up { color: #2e7d32; font-weight: bold; }
+        .val-down { color: #c62828; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div id="titleScreen" class="title-screen">
+        <div class="title-main">宮闈殘局<br><span style="font-size: 1.5rem; font-weight: normal; letter-spacing: 5px;">鳳凰浴火錄</span></div>
+        <div style="background: rgba(0,0,0,0.4); padding: 20px; border-radius: 8px; max-width: 600px; color: #fff;">
+            <p style="margin-bottom: 10px; line-height: 1.6;">
+                曾權傾一時的貴妃，如今深陷泥潭。<br>
+                在危機四伏的後宮，唯有步步為營，方能鳳凰涅槃。
+            </p>
+            <p style="font-size: 0.9rem; opacity: 0.9; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.3); padding-top: 10px;">
+                💡 最終修復：解決後期選項過多導致的版面問題與判定 Bug。
+            </p>
+        </div>
+        <button class="start-btn" onclick="startGame()">入宮破局</button>
+    </div>
+
+    <div class="stats-bar" id="statsBar"></div>
+    <div class="inventory-bar" id="inventoryBar">
+        <span class="inv-label">行囊:</span>
+        <span id="invList" style="display:flex; gap:5px;">無</span>
+    </div>
+    <div class="story-area" id="storyArea">
+        <div id="storyContent"></div>
+    </div>
+    <div class="choices-area" id="choicesArea"></div>
+</div>
+
+<script>
+    const initialStats = {
+        favor: 50, prestige: 50, cunning: 50, health: 50, beauty: 60, family: 40, connection: 30
+    };
+
+    const statLabels = {
+        favor: "👑 聖寵", prestige: "💎 威望", cunning: "🦊 心機",
+        health: "💖 體質", beauty: "🌹 美貌", family: "🏛️ 家族", connection: "🕸️ 人脈"
+    };
+
+    let currentState = { ...initialStats };
+    let currentInventory = [];
+    let currentSceneId = "background_selection";
+
+    const scenes = {
+        "background_selection": {
+            text: `<p><strong>【序章：前塵往事】</strong></p><p>入宮之前，你本是……</p>`,
+            choices: [
+                {
+                    text: "將門虎女 - 性格剛烈，體魄強健",
+                    effect: { health: 20, family: 20, cunning: -10, beauty: -5 },
+                    nextScene: "start", gainItem: "傳家玉佩"
+                },
+                {
+                    text: "書香世家 - 博覽群書，心思縝密",
+                    effect: { cunning: 20, prestige: 10, health: -10, family: -5 },
+                    nextScene: "start", gainItem: "醫書殘卷"
+                },
+                {
+                    text: "江南名妓 - 豔冠群芳，八面玲瓏",
+                    effect: { beauty: 25, favor: 10, connection: 15, prestige: -20, family: -20 },
+                    nextScene: "start", gainItem: "迷情香"
+                }
+            ]
+        },
+        "start": {
+            text: `<p><strong>第一章：風雨欲來</strong></p><p>「${getAppellation()}，你父親被彈劾貪污，你有何話說？」</p>`,
+            choices: [
+                {
+                    text: "哭訴冤枉，提及舊情",
+                    effect: { favor: 5, prestige: -10 },
+                    nextScene: "scene_1_mercy"
+                },
+                {
+                    text: "不卑不亢，據理力爭",
+                    effect: { favor: -10, prestige: 5, cunning: 5 },
+                    nextScene: "scene_1_argue"
+                },
+                {
+                    text: "禍水東引 (心機判定)",
+                    isRisk: true, riskStat: "cunning",
+                    successScene: "scene_1_scheme", failScene: "scene_1_mercy",
+                    resultText: "你試圖轉移焦點，但語氣略顯慌張。",
+                    effect: { cunning: 2 }
+                },
+                {
+                    text: "【道具：傳家玉佩】呈上先帝御賜玉佩",
+                    reqItem: "傳家玉佩",
+                    effect: { favor: 10, prestige: 20 },
+                    nextScene: "scene_1_scheme"
+                }
+            ]
+        },
+        "scene_1_mercy": {
+            text: `<p>皇上禁了你的足。宮女送來一碗散發苦味的安神湯。</p>`,
+            choices: [
+                {
+                    text: "喝下 (體質判定)",
+                    isRisk: true, riskStat: "health",
+                    successScene: "scene_2_poison_resist", failScene: "scene_2_poison_fail",
+                    effect: { health: -5 }
+                },
+                {
+                    text: "【道具：醫書殘卷】查驗藥渣",
+                    reqItem: "醫書殘卷",
+                    effect: { cunning: 10, prestige: 5 },
+                    nextScene: "scene_2_expose", gainItem: "有毒藥渣"
+                },
+                {
+                    text: "偷偷倒掉",
+                    effect: { cunning: 5 },
+                    resultText: "你將藥倒進花盆，花枯萎了。",
+                    nextScene: "scene_daily_intro"
+                }
+            ]
+        },
+        "scene_1_argue": {
+            text: `<p>被降位後，你在御花園遇見太醫溫實初。</p>`,
+            choices: [
+                {
+                    text: "索要補藥",
+                    effect: { health: 10, connection: 5 },
+                    nextScene: "scene_daily_intro", gainItem: "養身丸"
+                },
+                {
+                    text: "保持距離",
+                    effect: { prestige: 5 },
+                    nextScene: "scene_daily_intro"
+                }
+            ]
+        },
+        "scene_1_scheme": {
+            text: `<p>密信警告：明日御花園有陷阱。</p>`,
+            choices: [
+                {
+                    text: "前往一探 (心機判定)",
+                    isRisk: true, riskStat: "cunning",
+                    successScene: "scene_3_trap_success", failScene: "scene_3_trap_fail"
+                },
+                {
+                    text: "按兵不動",
+                    effect: { cunning: 5 },
+                    nextScene: "scene_daily_intro"
+                }
+            ]
+        },
+        "scene_2_poison_fail": {
+            text: `<p class="highlight-danger">你中毒了，元氣大傷！</p>`,
+            choices: [{ text: "掙扎求生", effect: { health: -25, beauty: -10 }, nextScene: "scene_daily_intro" }]
+        },
+        "scene_2_poison_resist": {
+            text: `<p>你扛住了毒性，但仍需調養。</p>`,
+            choices: [{ text: "調養", effect: { health: -5 }, nextScene: "scene_daily_intro" }]
+        },
+        "scene_2_expose": {
+            text: `<p>你發現了蘭嬪下毒的證據。</p>`,
+            choices: [{ text: "收好證據", effect: { prestige: 10 }, nextScene: "scene_daily_intro", gainItem: "蘭嬪罪證" }]
+        },
+        "scene_3_trap_success": {
+            text: `<p>你反將一軍，蘭嬪被罰。</p>`,
+            choices: [{ text: "大快人心", effect: { prestige: 15, favor: 10 }, nextScene: "scene_daily_intro" }]
+        },
+        "scene_3_trap_fail": {
+            text: `<p>中計了！你被誤會私會侍衛。</p>`,
+            choices: [{ text: "百口莫辯", effect: { favor: -15, prestige: -15 }, nextScene: "scene_daily_intro" }]
+        },
+        "scene_daily_intro": {
+            text: `<p><strong>【宮廷日常：韜光養晦】</strong></p><p>太后壽宴在即，你需要做準備。</p>`,
+            choices: [{ text: "開始規劃", nextScene: "scene_daily_action_1" }]
+        },
+        "scene_daily_action_1": {
+            text: `<p>今日風和日麗，你要做什麼？</p>`,
+            choices: [
+                { text: "研讀醫書 (升心機)", effect: { cunning: 8, health: -2 }, nextScene: "scene_daily_action_2" },
+                { text: "對鏡貼花黃 (升美貌)", effect: { beauty: 8, favor: 2 }, nextScene: "scene_daily_action_2" },
+                { text: "賄賂御膳房 (升人脈)", effect: { connection: 8, family: -5 }, nextScene: "scene_daily_action_2", gainItem: "太后情報" },
+                { text: "【道具：養身丸】服用", reqItem: "養身丸", effect: { health: 15, beauty: 5 }, removeItem: "養身丸", nextScene: "scene_daily_action_2" }
+            ]
+        },
+        "scene_daily_action_2": {
+            text: `<p>夜深了，你決定……</p>`,
+            choices: [
+                { text: "苦練驚鴻舞 (體質判定)", isRisk: true, riskStat: "health", successScene: "scene_daily_result_dance", failScene: "scene_daily_result_tired", effect: { beauty: 5 } },
+                { text: "刺繡佛經 (升威望)", effect: { prestige: 5, cunning: 3 }, nextScene: "scene_4_banquet_start" },
+                { text: "【道具：迷情香】試用", reqItem: "迷情香", effect: { favor: 10, beauty: 5 }, removeItem: "迷情香", nextScene: "scene_4_banquet_start" }
+            ]
+        },
+        "scene_daily_result_dance": {
+            text: `<p>舞藝大進！</p>`,
+            choices: [{ text: "迎接壽宴", nextScene: "scene_4_banquet_start", gainItem: "精湛舞技" }]
+        },
+        "scene_daily_result_tired": {
+            text: `<p>體力不支扭傷了腳。</p>`,
+            choices: [{ text: "休息", effect: { health: -10, beauty: -5 }, nextScene: "scene_4_banquet_start" }]
+        },
+        "scene_4_banquet_start": {
+            text: `<p><strong>第二章：太后壽宴</strong></p><p>這是展現自我的機會。</p>`,
+            choices: [
+                {
+                    text: "【道具：精湛舞技】獻舞驚鴻",
+                    reqItem: "精湛舞技",
+                    effect: { favor: 25, prestige: 15 },
+                    nextScene: "scene_5_emperor_sick"
+                },
+                {
+                    text: "獻舞 (美貌判定)",
+                    isRisk: true, riskStat: "beauty",
+                    successScene: "scene_5_emperor_sick", failScene: "scene_5_emperor_sick", 
+                    effect: { favor: 5 },
+                    resultText: "你盡力一舞，雖無驚豔全場，但也算得體。" // 成功文本
+                },
+                {
+                    text: "【道具：太后情報】聊佛法",
+                    reqItem: "太后情報",
+                    effect: { prestige: 20, connection: 10, favor: 5 },
+                    nextScene: "scene_5_emperor_sick"
+                },
+                {
+                    text: "低調不出錯",
+                    effect: { connection: 5 },
+                    nextScene: "scene_5_emperor_sick"
+                }
+            ]
+        },
+        "scene_5_emperor_sick": {
+            text: `<p><strong>第三章：最終決戰</strong></p><p>皇上病重，蘭嬪誣陷你。這是生死關頭。</p>`,
+            choices: [
+                {
+                    text: "【道具：蘭嬪罪證】當眾揭發 (必勝)",
+                    reqItem: "蘭嬪罪證", effect: { prestige: 30, favor: 30 },
+                    nextScene: "ending_empress"
+                },
+                {
+                    text: "【道具：醫書殘卷】自證清白 (需醫術)",
+                    reqItem: "醫書殘卷", effect: { favor: 40, prestige: 20 },
+                    nextScene: "ending_favorite"
+                },
+                {
+                    text: "【聖寵 > 60】哭訴求情", // 門檻降低
+                    requirement: { stat: "favor", val: 60 }, effect: { prestige: -10 },
+                    nextScene: "ending_peace" 
+                },
+                {
+                    text: "【家族 > 60】前朝施壓",
+                    requirement: { stat: "family", val: 60 }, effect: { favor: -10, prestige: 10 },
+                    nextScene: "ending_peace"
+                },
+                {
+                    text: "冒險反擊 (心機判定)", 
+                    isRisk: true, riskStat: "cunning",
+                    successScene: "scene_6_scheme_success", failScene: "ending_death",
+                    effect: { cunning: 5 }
+                },
+                {
+                    text: "竭力周旋 (通用選項)", 
+                    effect: { health: -10 },
+                    resultText: "你拼死辯解，雖未洗清冤屈，但暫時保住一命打入冷宮。",
+                    nextScene: "ending_cold"
+                }
+            ]
+        },
+        "scene_6_scheme_success": {
+            text: "<p>你設計讓蘭嬪『意外』小產，皇上厭棄了她。</p>",
+            choices: [{ text: "查看結局", nextScene: "ending_favorite" }]
+        },
+        "ending_empress": {
+            text: `<p style="color:var(--royal-gold);font-size:1.5rem;">【結局：鳳臨天下】</p><p>你被冊立為后。</p>`,
+            choices: [{ text: "再入宮門", action: "restart" }]
+        },
+        "ending_favorite": {
+            text: `<p style="color:var(--royal-red);font-size:1.5rem;">【結局：盛世寵妃】</p><p>你成為皇上最信任的人。</p>`,
+            choices: [{ text: "再入宮門", action: "restart" }]
+        },
+        "ending_peace": {
+            text: `<p style="color:#2E8B57;font-size:1.5rem;">【結局：歲月靜好】</p><p>你保住了地位，安穩度日。</p>`,
+            choices: [{ text: "再入宮門", action: "restart" }]
+        },
+        "ending_cold": {
+            text: `<p style="color:#555;font-size:1.5rem;">【結局：冷宮淒涼】</p><p>你保住一命，但被幽禁冷宮。</p>`,
+            choices: [{ text: "含恨重來", action: "restart" }]
+        },
+        "ending_death": {
+            text: `<p style="color:black;font-size:1.5rem;">【結局：賜死】</p><p>計謀敗露，賜毒酒一杯。</p>`,
+            choices: [{ text: "再次挑戰", action: "restart" }]
+        }
+    };
+
+    function getAppellation() { return currentState.favor > 70 ? "愛妃" : (currentState.favor < 30 ? "賤人" : "貴妃"); }
+    function startGame() {
+        document.getElementById('titleScreen').classList.add('hidden');
+        resetStats(); renderStats(); renderInventory(); loadScene("background_selection");
+    }
+    function resetStats() { currentState = { ...initialStats }; currentInventory = []; }
+    function renderStats() {
+        const statsBar = document.getElementById('statsBar'); statsBar.innerHTML = '';
+        checkGameOverConditions();
+        for (const [key, val] of Object.entries(currentState)) {
+            const div = document.createElement('div'); div.className = 'stat-item';
+            div.innerHTML = `<span class="stat-label">${statLabels[key]}</span><span class="stat-value" id="stat-${key}">${val}</span>`;
+            statsBar.appendChild(div);
+        }
+    }
+    function renderInventory() {
+        const invList = document.getElementById('invList');
+        invList.innerHTML = currentInventory.length === 0 ? '<span style="color:#999;">暫無</span>' : currentInventory.map(item => `<span class="inv-item">${item}</span>`).join('');
+    }
+    function updateStats(effects) {
+        if (!effects) return;
+        for (const [key, change] of Object.entries(effects)) {
+            if (change === 0) continue;
+            currentState[key] += change;
+            if (currentState[key] > 100) currentState[key] = 100;
+            if (currentState[key] < 0) currentState[key] = 0;
+            const sign = change > 0 ? '+' : '';
+            const colorClass = change > 0 ? 'val-up' : 'val-down';
+            showFloatText(key, sign + change, colorClass);
+        }
+        renderStats();
+    }
+    function showFloatText(key, text, colorClass) {
+        const statEl = document.getElementById(`stat-${key}`);
+        if (!statEl) return;
+        const rect = statEl.getBoundingClientRect();
+        const floatEl = document.createElement('div');
+        floatEl.className = `float-text ${colorClass}`;
+        floatEl.innerText = text;
+        floatEl.style.left = (rect.left + 10) + 'px';
+        floatEl.style.top = (rect.top + 20) + 'px';
+        document.body.appendChild(floatEl);
+        setTimeout(() => floatEl.remove(), 1500);
+    }
+    function checkGameOverConditions() {
+        if (currentSceneId === "background_selection" || currentSceneId.startsWith("ending_")) return false;
+        let reason = "";
+        if (currentState.favor <= 0) reason = "聖寵耗盡，被賜死。";
+        else if (currentState.health <= 0) reason = "病重身亡。";
+        else if (currentState.family <= 0) reason = "家族抄斬，被打入冷宮。";
+        if (reason) { triggerGameOver(reason); return true; }
+        return false;
+    }
+    function triggerGameOver(reason) {
+        document.getElementById('storyContent').innerHTML = `<p style="color:#c62828;font-weight:bold;font-size:1.5rem;text-align:center;">【敗局】</p><p style="text-align:center;">${reason}</p>`;
+        document.getElementById('choicesArea').innerHTML = `<button class="choice-btn" onclick="startGame()">重新入宮</button>`;
+    }
+    function loadScene(sceneId) {
+        currentSceneId = sceneId; const scene = scenes[sceneId];
+        document.getElementById('storyContent').innerHTML = scene.text;
+        document.getElementById('storyArea').scrollTop = 0;
+        const choicesArea = document.getElementById('choicesArea'); choicesArea.innerHTML = '';
+
+        scene.choices.forEach(choice => {
+            const btn = document.createElement('button'); btn.className = 'choice-btn';
+            let disabled = false, reqText = '';
+            
+            if (choice.requirement) {
+                const { stat, val } = choice.requirement;
+                if (currentState[stat] <= val) { disabled = true; reqText = `(需${statLabels[stat].split(' ')[1]}>${val})`; }
+            }
+            if (choice.reqItem) {
+                if (!currentInventory.includes(choice.reqItem)) { disabled = true; reqText = `<span class="req-item"> (需: ${choice.reqItem})</span>`; }
+                else { reqText = `<span class="highlight-success"> 【持有】</span>`; }
+            }
+
+            let html = `<div class="choice-btn-row"><span>${choice.text}</span><span class="choice-req">${reqText}</span></div>`;
+            let effectHint = [];
+            if (choice.effect) {
+                for (const [k, v] of Object.entries(choice.effect)) {
+                    effectHint.push(`<span style="color:${v > 0 ? '#2e7d32' : '#c62828'}">${statLabels[k].split(' ')[1]}${v > 0 ? '⬆' : '⬇'}</span>`);
+                }
+            }
+            if (choice.isRisk) effectHint.push(`⚠️ 機率: ${statLabels[choice.riskStat].split(' ')[1]}`);
+            if (choice.gainItem) effectHint.push(`<span style="color:#8B4513">🎁 獲得: ${choice.gainItem}</span>`);
+            if (effectHint.length > 0) html += `<span class="choice-effect">${effectHint.join('  ')}</span>`;
+
+            btn.innerHTML = html; btn.disabled = disabled;
+            btn.onclick = () => handleChoice(choice);
+            choicesArea.appendChild(btn);
+        });
+    }
+    function handleChoice(choice) {
+        if (choice.action === "restart") { startGame(); return; }
+        const eventLog = document.createElement('div'); eventLog.className = 'event-log';
+        let nextSceneId = choice.nextScene, resultText = choice.resultText || "";
+
+        if (choice.isRisk) {
+            const roll = Math.floor(Math.random() * 100);
+            if (roll < currentState[choice.riskStat]) {
+                nextSceneId = choice.successScene; eventLog.innerHTML = `<span class="highlight-success">(判定成功)</span> ` + resultText;
+            } else {
+                nextSceneId = choice.failScene; 
+                // 這裡加入特殊的失敗文本判定
+                let failText = "運氣不佳...";
+                if (choice.text.includes("獻舞")) failText = "你盡力一舞，但腳下一個踉蹌，引得太后皺眉。";
+                
+                eventLog.innerHTML = `<span class="highlight-danger">(判定失敗)</span> ${failText}`;
+            }
+        } else { eventLog.innerText = resultText; }
+
+        updateStats(choice.effect);
+        if (choice.gainItem && !currentInventory.includes(choice.gainItem)) {
+            currentInventory.push(choice.gainItem); eventLog.innerHTML += `<br><span style="color:#8B4513;">🎁 獲得道具：${choice.gainItem}</span>`; renderInventory();
+        }
+        if (choice.removeItem) { currentInventory = currentInventory.filter(i => i !== choice.removeItem); renderInventory(); }
+
+        if (checkGameOverConditions()) return;
+        document.getElementById('storyContent').appendChild(eventLog);
+        document.getElementById('storyArea').scrollTop = document.getElementById('storyArea').scrollHeight;
+        document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
+        setTimeout(() => loadScene(nextSceneId), 1500);
+    }
+</script>
+</body>
+</html>

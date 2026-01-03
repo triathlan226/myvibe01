@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>耄耄歷險記</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Noto Sans TC', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            border: 8px solid #000;
+            background: #333;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI 層級 */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 100;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-size: 70px;
+            margin: 0 0 20px 0;
+            color: #FFD700;
+            text-shadow: 4px 4px 0px #000;
+            text-align: center;
+        }
+
+        p {
+            font-size: 18px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #ddd;
+        }
+
+        /* 按鈕風格 */
+        button {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-weight: bold;
+            font-size: 24px;
+            padding: 15px 40px;
+            background: #ff4757;
+            color: white;
+            border: 4px solid #000;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 6px 6px 0px #000;
+            transition: all 0.1s;
+            margin: 10px;
+            min-width: 220px;
+        }
+
+        button:hover {
+            background: #ff6b81;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #000;
+        }
+
+        button.secondary {
+            background: #1e90ff;
+        }
+
+        /* HUD 資訊 */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 50;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .hp-bar-container {
+            width: 200px;
+            height: 20px;
+            background: #333;
+            border: 3px solid #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            background: #2ed573;
+            width: 100%;
+            transition: width 0.3s;
+        }
+
+        #hud-pause-btn {
+            pointer-events: auto;
+            font-size: 18px;
+            padding: 8px 20px;
+            min-width: auto;
+            margin: 0;
+        }
+
+        .key-hint {
+            background: #eee;
+            color: #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <!-- 遊戲中資訊 -->
+    <div id="hud" class="hidden">
+        <div>
+            <div id="score-display" style="font-size: 24px; font-weight: bold;">分數: 0</div>
+            <div class="hp-bar-container">
+                <div id="hp-bar" class="hp-bar-fill"></div>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <div id="time-display" style="font-size: 20px;">時間: 00:00</div>
+            <button id="hud-pause-btn">暫停 (P)</button>
+        </div>
+    </div>
+
+    <!-- 主選單 -->
+    <div id="start-screen" class="overlay">
+        <h1>耄耄歷險記</h1>
+        <p>
+            移動: <span class="key-hint">W</span><span class="key-hint">A</span><span class="key-hint">S</span><span class="key-hint">D</span><br>
+            射擊: <span class="key-hint">空白鍵</span> | 暫停: <span class="key-hint">P</span>
+        </p>
+        <button id="start-btn">開始遊戲</button>
+    </div>
+
+    <!-- 暫停畫面 -->
+    <div id="pause-screen" class="overlay hidden">
+        <h1>遊戲暫停</h1>
+        <button id="resume-btn">繼續遊戲</button>
+        <button id="pause-restart-btn" class="secondary">重新開始</button>
+        <button id="pause-menu-btn" class="secondary">回到主畫面</button>
+    </div>
+
+    <!-- 結束畫面 -->
+    <div id="game-over-screen" class="overlay hidden">
+        <h1 style="color: #ff4757;">耄耄破防不玩了</h1>
+        <p style="font-size: 24px;">最終分數: <span id="final-score" style="color: #FFD700;">0</span></p>
+        <button id="restart-btn">重新開始</button>
+        <button id="menu-btn" class="secondary">回到主畫面</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 遊戲狀態
+    let gameState = 'MENU'; 
+    let score = 0;
+    let survivalTime = 0;
+    let gameStartTime = 0;
+
+    // 遊戲對象
+    let player;
+    let bullets = [];
+    let enemies = [];
+    let enemyTimer = 0;
+
+    // 背景載入與保護
+    let isBgLoaded = false;
+    const bgImg = new Image();
+    bgImg.onload = () => { isBgLoaded = true; };
+    bgImg.onerror = () => { isBgLoaded = false; };
+    bgImg.src = 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1000&q=80';
+
+    // 鍵盤狀態
+    const keys = {};
+    window.addEventListener('keydown', e => {
+        const k = e.key.toLowerCase();
+        keys[k] = true;
+        if (k === 'p' || e.key === 'Escape') {
+            if (gameState === 'PLAYING') pauseGame();
+            else if (gameState === 'PAUSED') resumeGame();
+        }
+    });
+    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+    // 耄耄主角
+    class MaoMao {
+        constructor() {
+            this.x = canvas.width / 2;
+            this.y = canvas.height - 100;
+            this.speed = 5;
+            this.hp = 100;
+            this.lastShot = 0;
+        }
+
+        update() {
+            if (keys['w']) this.y -= this.speed;
+            if (keys['s']) this.y += this.speed;
+            if (keys['a']) this.x -= this.speed;
+            if (keys['d']) this.x += this.speed;
+
+            this.x = Math.max(25, Math.min(canvas.width - 25, this.x));
+            this.y = Math.max(25, Math.min(canvas.height - 25, this.y));
+
+            if (keys[' '] && Date.now() - this.lastShot > 250) {
+                bullets.push({x: this.x, y: this.y - 20, vy: -8});
+                this.lastShot = Date.now();
+            }
+        }
+
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            
+            // 耳朵
+            ctx.beginPath();
+            ctx.moveTo(-20, -10); ctx.lineTo(-25, -30); ctx.lineTo(-10, -20); ctx.fill(); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(20, -10); ctx.lineTo(25, -30); ctx.lineTo(10, -20); ctx.fill(); ctx.stroke();
+
+            // 頭部
+            ctx.beginPath();
+            ctx.arc(0, 0, 22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 眼睛
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(-8, -5, 3, 0, Math.PI * 2);
+            ctx.arc(8, -5, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 鼻子
+            ctx.fillStyle = 'pink';
+            ctx.beginPath();
+            ctx.arc(0, 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+    }
+
+    function initGame() {
+        player = new MaoMao();
+        bullets = [];
+        enemies = [];
+        score = 0;
+        survivalTime = 0;
+        gameStartTime = Date.now();
+        enemyTimer = 0;
+        
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        document.getElementById('pause-screen').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        document.getElementById('hp-bar').style.width = '100%';
+        
+        gameState = 'PLAYING';
+        requestAnimationFrame(gameLoop);
+    }
+
+    function pauseGame() {
+        if (gameState !== 'PLAYING') return;
+        gameState = 'PAUSED';
+        document.getElementById('pause-screen').classList.remove('hidden');
+    }
+
+    function resumeGame() {
+        if (gameState !== 'PAUSED') return;
+        gameState = 'PLAYING';
+        document.getElementById('pause-screen').classList.add('hidden');
+        requestAnimationFrame(gameLoop);
+    }
+
+    function backToMenu() {
+        gameState = 'MENU';
+        document.getElementById('start-screen').classList.remove('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        document.getElementById('pause-screen').classList.add('hidden');
+        document.getElementById('hud').classList.add('hidden');
+    }
+
+    function gameOver() {
+        gameState = 'GAMEOVER';
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+        document.getElementById('hud').classList.add('hidden');
+    }
+
+    function gameLoop() {
+        if (gameState !== 'PLAYING') return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 背景繪製與保護
+        if (isBgLoaded && bgImg.complete && bgImg.naturalWidth !== 0) {
+            ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+        } else {
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+
+        // 更新數據
+        survivalTime = Math.floor((Date.now() - gameStartTime) / 1000);
+        document.getElementById('score-display').innerText = `分數: ${score}`;
+        const m = Math.floor(survivalTime / 60).toString().padStart(2, '0');
+        const s = (survivalTime % 60).toString().padStart(2, '0');
+        document.getElementById('time-display').innerText = `時間: ${m}:${s}`;
+
+        player.update();
+        player.draw();
+
+        // 子彈
+        bullets.forEach((b, index) => {
+            b.y += b.vy;
+            ctx.fillStyle = 'yellow';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 5, 0, Math.PI*2);
+            ctx.fill();
+            if (b.y < 0) bullets.splice(index, 1);
+        });
+
+        // 敵人
+        enemyTimer++;
+        if (enemyTimer > Math.max(20, 50 - Math.floor(survivalTime/5))) {
+            enemies.push({
+                x: Math.random() * (canvas.width - 40) + 20,
+                y: -30,
+                speed: 2 + Math.random() * 2 + (survivalTime / 30)
+            });
+            enemyTimer = 0;
+        }
+
+        enemies.forEach((e, ei) => {
+            e.y += e.speed;
+            
+            ctx.fillStyle = '#ff4757';
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.fillRect(e.x - 15, e.y - 15, 30, 30);
+            ctx.strokeRect(e.x - 15, e.y - 15, 30, 30);
+
+            // 碰撞子彈
+            bullets.forEach((b, bi) => {
+                const dist = Math.hypot(e.x - b.x, e.y - b.y);
+                if (dist < 25) {
+                    enemies.splice(ei, 1);
+                    bullets.splice(bi, 1);
+                    score += 100;
+                }
+            });
+
+            // 碰撞玩家
+            const pDist = Math.hypot(e.x - player.x, e.y - player.y);
+            if (pDist < 35) {
+                enemies.splice(ei, 1);
+                player.hp -= 20;
+                document.getElementById('hp-bar').style.width = player.hp + '%';
+                if (player.hp <= 0) gameOver();
+            }
+
+            if (e.y > canvas.height) enemies.splice(ei, 1);
+        });
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // 事件
+    document.getElementById('start-btn').onclick = initGame;
+    document.getElementById('restart-btn').onclick = initGame;
+    document.getElementById('pause-restart-btn').onclick = initGame;
+    document.getElementById('resume-btn').onclick = resumeGame;
+    document.getElementById('hud-pause-btn').onclick = pauseGame;
+    document.getElementById('menu-btn').onclick = backToMenu;
+    document.getElementById('pause-menu-btn').onclick = backToMenu;
+
+</script>
+
+</body>
+</html>
