@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>像素格鬥小遊戲</title>
+<style>
+body{background:#111;color:#fff;font-family:Arial;text-align:center}
+#game{position:relative;width:800px;height:300px;margin:20px auto;background:#222;border:3px solid #fff;overflow:hidden}
+.fighter{position:absolute;bottom:20px;width:20px;height:20px}
+#p1::before,#p2::before{content:"";position:absolute;width:20px;height:20px}
+#p1::before{background:red;box-shadow:0 -20px red,-20px 0 red,20px 0 red,0 20px red,-20px 20px red,20px 20px red,0 40px red}
+#p2::before{background:#4aa3ff;box-shadow:0 -20px #4aa3ff,-20px 0 #4aa3ff,20px 0 #4aa3ff,0 20px #4aa3ff,-20px 20px #4aa3ff,20px 20px #4aa3ff,0 40px #4aa3ff}
+#ui{width:800px;margin:auto;display:flex;justify-content:space-between}
+.healthbar{width:300px;height:20px;background:#555;border:2px solid #fff}
+.health{height:100%;background:lime;transition:width .2s}
+.attack-left{animation:pl .15s}
+.attack-right{animation:pr .15s}
+@keyframes pl{50%{transform:translateX(20px)}}
+@keyframes pr{50%{transform:translateX(-20px)}}
+.hit{animation:h .2s}
+@keyframes h{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.jump{animation:j .5s}
+@keyframes j{0%{bottom:20px}50%{bottom:100px}100%{bottom:20px}}
+.effect{position:absolute;width:10px;height:10px;background:yellow;
+box-shadow:10px 0 yellow,-10px 0 yellow,0 10px yellow,0 -10px yellow;
+animation:e .3s forwards}
+@keyframes e{0%{transform:scale(0);opacity:1}100%{transform:scale(2);opacity:0}}
+#message{font-size:24px;color:yellow;margin-top:10px}
+button{margin-top:10px;padding:8px 16px;font-size:16px}
+</style>
+</head>
+<body>
+
+<h1>🟥🟦 像素格鬥小遊戲</h1>
+
+<div id="ui">
+  <div class="healthbar"><div id="hp1" class="health"></div></div>
+  <div class="healthbar"><div id="hp2" class="health"></div></div>
+</div>
+
+<div id="game">
+  <div id="p1" class="fighter"></div>
+  <div id="p2" class="fighter"></div>
+</div>
+
+<div id="message"></div>
+<button id="restart" style="display:none">重新一局</button>
+
+<script>
+const game=document.getElementById("game")
+const p1El=document.getElementById("p1")
+const p2El=document.getElementById("p2")
+const hp1=document.getElementById("hp1")
+const hp2=document.getElementById("hp2")
+const msg=document.getElementById("message")
+const restartBtn=document.getElementById("restart")
+let gameOver=false
+
+const p1={el:p1El,x:100,hp:100,cd:false,jumping:false}
+const p2={el:p2El,x:600,hp:100,cd:false,jumping:false}
+
+function update(){
+  p1.el.style.left=p1.x+"px"
+  p2.el.style.left=p2.x+"px"
+  hp1.style.width=p1.hp+"%"
+  hp2.style.width=p2.hp+"%"
+}
+
+function effect(x){
+  const e=document.createElement("div")
+  e.className="effect"
+  e.style.left=x+"px"
+  e.style.bottom="120px"
+  game.appendChild(e)
+  setTimeout(()=>e.remove(),300)
+}
+
+function attack(a,d,cls){
+  if(a.cd||gameOver)return
+  a.cd=true
+  a.el.classList.add(cls)
+  setTimeout(()=>a.el.classList.remove(cls),150)
+  if(Math.abs(a.x-d.x)<60){
+    d.hp=Math.max(0,d.hp-10)
+    d.el.classList.add("hit")
+    effect(d.x+10)
+    setTimeout(()=>d.el.classList.remove("hit"),200)
+  }
+  setTimeout(()=>a.cd=false,350)
+  checkWin()
+}
+
+function jump(p){
+  if(p.jumping||gameOver)return
+  p.jumping=true
+  p.el.classList.add("jump")
+  setTimeout(()=>{p.el.classList.remove("jump");p.jumping=false},500)
+}
+
+function checkWin(){
+  if(p1.hp===0){msg.textContent="🔵 藍色玩家勝利！";endGame()}
+  if(p2.hp===0){msg.textContent="🔴 紅色玩家勝利！";endGame()}
+}
+
+function endGame(){
+  gameOver=true
+  restartBtn.style.display="inline-block"
+}
+
+restartBtn.onclick=()=>{
+  p1.x=100;p2.x=600
+  p1.hp=100;p2.hp=100
+  msg.textContent=""
+  gameOver=false
+  restartBtn.style.display="none"
+  update()
+}
+
+document.addEventListener("keydown",e=>{
+  if(gameOver)return
+  switch(e.key){
+    case "a":case "A":p1.x=Math.max(0,p1.x-20);break
+    case "d":case "D":p1.x=Math.min(760,p1.x+20);break
+    case "w":case "W":jump(p1);break
+    case "s":case "S":attack(p1,p2,"attack-left");break
+    case "ArrowLeft":p2.x=Math.max(0,p2.x-20);break
+    case "ArrowRight":p2.x=Math.min(760,p2.x+20);break
+    case "ArrowUp":jump(p2);break
+    case "ArrowDown":attack(p2,p1,"attack-right");break
+  }
+  update()
+})
+
+update()
+</script>
+
+<p>
+P1：A / D 移動，W 跳躍，S 攻擊<br>
+P2：← / → 移動，↑ 跳躍，↓ 攻擊
+</p>
+
+</body>
+</html>

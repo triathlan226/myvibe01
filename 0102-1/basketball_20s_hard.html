@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>🏀 高難度 20 秒籃球挑戰</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Arial Black", "Noto Sans TC", sans-serif;
+      background: linear-gradient(#ff8c00, #ff4500);
+      text-align: center;
+      color: #fff;
+    }
+
+    h1 { margin-top: 20px; letter-spacing: 2px; }
+    #info { font-size: 20px; margin: 10px; }
+    #gameArea {
+      position: relative;
+      width: 420px;
+      height: 300px;
+      margin: 20px auto;
+      background: #c1440e;
+      border: 4px solid #fff;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+
+    #ball {
+      position: absolute;
+      width: 55px;
+      height: 55px;
+      background: #ff7a18;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      user-select: none;
+      transition: transform 0.1s, width 0.1s, height 0.1s;
+      box-shadow: inset -4px -4px rgba(0,0,0,0.2);
+    }
+
+    #ball:active { transform: scale(0.85); }
+    #result { display: none; margin-top: 30px; }
+    button {
+      padding: 10px 20px; font-size: 18px; border: none;
+      border-radius: 8px; cursor: pointer;
+      background: #fff; color: #ff4500; font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🏀 高難度 20 秒籃球挑戰 🏀</h1>
+
+<div id="info">
+  ⏱ 剩餘時間：<span id="time">20</span> 秒　
+  🏀 得分：<span id="score">0</span>
+</div>
+
+<div id="gameArea">
+  <div id="ball">🏀</div>
+</div>
+
+<div id="result">
+  <h2 id="mvpTitle"></h2>
+  <p id="finalScore"></p>
+  <button onclick="location.reload()">再挑戰一次</button>
+</div>
+
+<script>
+const ball = document.getElementById("ball");
+const gameArea = document.getElementById("gameArea");
+const scoreText = document.getElementById("score");
+const timeText = document.getElementById("time");
+const result = document.getElementById("result");
+const mvpTitle = document.getElementById("mvpTitle");
+const finalScore = document.getElementById("finalScore");
+
+let score = 0;
+let timeLeft = 20;
+let gameOver = false;
+let ballSize = 55; // 初始大小
+
+// 移動球位置
+function moveBall() {
+  const maxX = gameArea.clientWidth - ball.clientWidth;
+  const maxY = gameArea.clientHeight - ball.clientHeight;
+  const x = Math.random() * maxX;
+  const y = Math.random() * maxY;
+  ball.style.left = x + "px";
+  ball.style.top = y + "px";
+}
+
+// 點擊得分
+ball.addEventListener("click", () => {
+  if(gameOver) return;
+  score++;
+  scoreText.textContent = score;
+
+  // 每次點擊球變小 8%
+  ballSize *= 0.92;
+  if(ballSize < 20) ballSize = 20; // 最小尺寸限制
+  ball.style.width = ballSize + "px";
+  ball.style.height = ballSize + "px";
+
+  moveBall();
+});
+
+// 自動每秒移動一次球
+const autoMove = setInterval(() => {
+  if(!gameOver) moveBall();
+}, 1000);
+
+// 倒數計時
+const timer = setInterval(() => {
+  timeLeft--;
+  timeText.textContent = timeLeft;
+  if(timeLeft <= 0){
+    clearInterval(timer);
+    clearInterval(autoMove);
+    endGame();
+  }
+}, 1000);
+
+// 結算 MVP
+function endGame() {
+  gameOver = true;
+  ball.style.display = "none";
+  result.style.display = "block";
+
+  let title = "💪 繼續練習！";
+  if(score >= 20) title = "🏆 MVP 球星！";
+  else if(score >= 12) title = "⭐ 先發球員！";
+  else if(score >= 6) title = "🙂 板凳戰力！";
+
+  mvpTitle.textContent = title;
+  finalScore.textContent = "你的最終得分是：" + score;
+}
+
+moveBall();
+</script>
+
+</body>
+</html>
+
+

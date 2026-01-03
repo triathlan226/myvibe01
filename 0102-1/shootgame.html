@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太空射擊 困難模式</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: #111827;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: white;
+        }
+        #gameContainer {
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        #stats {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+        #gameCanvas {
+            border: 4px solid #06b6d4;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: block;
+            margin: 0 auto;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            padding: 3rem;
+            border-radius: 8px;
+            display: none;
+        }
+        #gameOver.show {
+            display: block;
+        }
+        #gameOver h2 {
+            font-size: 3rem;
+            color: #ef4444;
+            margin-bottom: 1rem;
+        }
+        #restartBtn {
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            background: #22c55e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        #restartBtn:hover {
+            background: #16a34a;
+        }
+        #instructions {
+            margin-top: 1.5rem;
+            color: #d1d5db;
+            max-width: 800px;
+        }
+        #instructions p {
+            margin: 0.5rem 0;
+        }
+        .score { color: #fbbf24; }
+        .lives { color: #ef4444; }
+        .highscore { color: #22c55e; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <h1>太空射擊 困難模式</h1>
+        <div id="stats">
+            <p class="score">分數: <span id="score">0</span></p>
+            <p class="lives">生命: <span id="lives">10</span></p>
+            <p class="highscore">最高分: <span id="highScore">0</span></p>
+        </div>
+        
+        <div style="position: relative;">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <div id="gameOver">
+                <h2>遊戲結束！</h2>
+                <p style="font-size: 1.5rem; margin: 1rem 0;">最終分數: <span id="finalScore">0</span></p>
+                <p style="font-size: 1.2rem; color: #9ca3af;">最高分數: <span id="finalHighScore">0</span></p>
+                <button id="restartBtn">再玩一次</button>
+            </div>
+        </div>
+
+        <div id="instructions">
+            <p style="font-size: 1.1rem; font-weight: bold;">控制方式：</p>
+            <p>方向鍵：移動 | 按住空白鍵：射擊（冷卻 0.2 秒）</p>
+            <p style="margin-top: 1rem; font-size: 0.9rem; color: #9ca3af;">
+                <span style="color: #ff3366;">紅色：</span>普通敵人 雙發 (15分) | 
+                <span style="color: #ff9933;"> 橘色：</span>快速敵人 快速單發 (30分) | 
+                <span style="color: #9933ff;"> 紫色：</span>坦克 五連發散彈 5HP (50分)
+            </p>
+            <p style="color: #00ffff; font-size: 0.9rem;">收集青色道具獲得三重射擊！</p>
+            <p style="color: #fbbf24; font-size: 0.9rem;">收集金色道具獲得護盾保護（8秒）！</p>
+            <p style="color: #fca5a5; font-size: 0.9rem; margin-top: 0.5rem;">💀 敵人火力全開模式 - 極限挑戰！</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const livesEl = document.getElementById('lives');
+        const highScoreEl = document.getElementById('highScore');
+        const gameOverEl = document.getElementById('gameOver');
+        const finalScoreEl = document.getElementById('finalScore');
+        const finalHighScoreEl = document.getElementById('finalHighScore');
+        const restartBtn = document.getElementById('restartBtn');
+
+        let score = 0;
+        let lives = 10;
+        let highScore = 0;
+        let gameOver = false;
+
+        const gameState = {
+            player: { x: 50, y: 275, width: 50, height: 50, speed: 8 },
+            bullets: [],
+            enemies: [],
+            enemyBullets: [],
+            powerups: [],
+            shields: [],
+            keys: {},
+            lastEnemySpawn: 0,
+            enemySpawnInterval: 600,
+            lastShot: 0,
+            shootCooldown: 200,
+            powerupActive: false,
+            powerupEndTime: 0,
+            shieldActive: false,
+            shieldEndTime: 0,
+            invincible: false,
+            invincibleEndTime: 0
+        };
+
+        document.addEventListener('keydown', (e) => {
+            gameState.keys[e.key] = true;
+            if (e.key === ' ') e.preventDefault();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            gameState.keys[e.key] = false;
+        });
+
+        restartBtn.addEventListener('click', resetGame);
+
+        function shootBullet(timestamp) {
+            if (gameOver || timestamp - gameState.lastShot < gameState.shootCooldown) return;
+            
+            if (gameState.powerupActive) {
+                gameState.bullets.push(
+                    { x: gameState.player.x + gameState.player.width, y: gameState.player.y + gameState.player.height / 2 - 2.5, width: 15, height: 5, speed: 12, vy: -2 },
+                    { x: gameState.player.x + gameState.player.width, y: gameState.player.y + gameState.player.height / 2 - 2.5, width: 15, height: 5, speed: 12, vy: 0 },
+                    { x: gameState.player.x + gameState.player.width, y: gameState.player.y + gameState.player.height / 2 - 2.5, width: 15, height: 5, speed: 12, vy: 2 }
+                );
+            } else {
+                gameState.bullets.push({
+                    x: gameState.player.x + gameState.player.width,
+                    y: gameState.player.y + gameState.player.height / 2 - 2.5,
+                    width: 15,
+                    height: 5,
+                    speed: 12,
+                    vy: 0
+                });
+            }
+            gameState.lastShot = timestamp;
+        }
+
+        function spawnEnemy() {
+            const size = 35 + Math.random() * 25;
+            const enemyType = Math.random();
+            
+            if (enemyType < 0.5) {
+                gameState.enemies.push({
+                    x: canvas.width + size,
+                    y: Math.random() * (canvas.height - size),
+                    width: size,
+                    height: size,
+                    speed: 4 + Math.random() * 3,
+                    type: 'normal',
+                    shootTimer: 0,
+                    shootInterval: 600 + Math.random() * 400
+                });
+            } else if (enemyType < 0.8) {
+                gameState.enemies.push({
+                    x: canvas.width + size,
+                    y: Math.random() * (canvas.height - size),
+                    width: size * 0.8,
+                    height: size * 0.8,
+                    speed: 6 + Math.random() * 3,
+                    type: 'fast',
+                    vy: 3 + Math.random() * 2,
+                    direction: Math.random() > 0.5 ? 1 : -1,
+                    shootTimer: 0,
+                    shootInterval: 800 + Math.random() * 400
+                });
+            } else {
+                gameState.enemies.push({
+                    x: canvas.width + size,
+                    y: Math.random() * (canvas.height - size),
+                    width: size * 1.3,
+                    height: size * 1.3,
+                    speed: 2 + Math.random() * 1.5,
+                    type: 'tank',
+                    health: 5,
+                    shootTimer: 0,
+                    shootInterval: 500
+                });
+            }
+        }
+
+        function spawnPowerup() {
+            const rand = Math.random();
+            if (rand < 0.1) {
+                // 三重射擊道具 (青色)
+                gameState.powerups.push({
+                    x: canvas.width + 30,
+                    y: Math.random() * (canvas.height - 30),
+                    width: 30,
+                    height: 30,
+                    speed: 2,
+                    type: 'tripleShot'
+                });
+            } else if (rand < 0.18) {
+                // 護盾道具 (金色)
+                gameState.shields.push({
+                    x: canvas.width + 30,
+                    y: Math.random() * (canvas.height - 30),
+                    width: 30,
+                    height: 30,
+                    speed: 2,
+                    type: 'shield'
+                });
+            }
+        }
+
+        function enemyShoot(enemy) {
+            if (enemy.type === 'normal') {
+                gameState.enemyBullets.push(
+                    { x: enemy.x - 12, y: enemy.y + enemy.height / 2 - 3 - 8, width: 12, height: 6, speed: 6 },
+                    { x: enemy.x - 12, y: enemy.y + enemy.height / 2 - 3 + 8, width: 12, height: 6, speed: 6 }
+                );
+            } else if (enemy.type === 'fast') {
+                gameState.enemyBullets.push({
+                    x: enemy.x - 12,
+                    y: enemy.y + enemy.height / 2 - 3,
+                    width: 12,
+                    height: 6,
+                    speed: 7
+                });
+            } else if (enemy.type === 'tank') {
+                gameState.enemyBullets.push(
+                    { x: enemy.x - 12, y: enemy.y + enemy.height / 2 - 3 - 25, width: 12, height: 6, speed: 5 },
+                    { x: enemy.x - 12, y: enemy.y + enemy.height / 2 - 3 - 12, width: 12, height: 6, speed: 5.5 },
+                    { x: enemy.x - 12, y: enemy.y + enemy.height / 2 - 3, width: 12, height: 6, speed: 6 },
+                    { x: enemy.x - 12, y: enemy.y + enemy.height / 2 - 3 + 12, width: 12, height: 6, speed: 5.5 },
+                    { x: enemy.x - 12, y: enemy.y + enemy.height / 2 - 3 + 25, width: 12, height: 6, speed: 5 }
+                );
+            }
+        }
+
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        function takeDamage() {
+            if (gameState.invincible) return;
+            
+            // 如果有護盾，護盾吸收傷害
+            if (gameState.shieldActive) {
+                gameState.shieldActive = false;
+                gameState.shieldEndTime = 0;
+                return;
+            }
+            
+            lives--;
+            livesEl.textContent = lives;
+            
+            if (lives <= 0) {
+                gameOver = true;
+                highScore = Math.max(highScore, score);
+                highScoreEl.textContent = highScore;
+                finalScoreEl.textContent = score;
+                finalHighScoreEl.textContent = highScore;
+                gameOverEl.classList.add('show');
+            }
+            
+            gameState.invincible = true;
+            gameState.invincibleEndTime = Date.now() + 1500;
+        }
+
+        function updateGame(timestamp) {
+            if (gameOver) return;
+
+            if (gameState.keys[' ']) {
+                shootBullet(timestamp);
+            }
+
+            if (gameState.keys['ArrowLeft'] && gameState.player.x > 0) {
+                gameState.player.x -= gameState.player.speed;
+            }
+            if (gameState.keys['ArrowRight'] && gameState.player.x < canvas.width - gameState.player.width) {
+                gameState.player.x += gameState.player.speed;
+            }
+            if (gameState.keys['ArrowUp'] && gameState.player.y > 0) {
+                gameState.player.y -= gameState.player.speed;
+            }
+            if (gameState.keys['ArrowDown'] && gameState.player.y < canvas.height - gameState.player.height) {
+                gameState.player.y += gameState.player.speed;
+            }
+
+            if (gameState.invincible && Date.now() > gameState.invincibleEndTime) {
+                gameState.invincible = false;
+            }
+
+            if (gameState.powerupActive && Date.now() > gameState.powerupEndTime) {
+                gameState.powerupActive = false;
+            }
+
+            if (gameState.shieldActive && Date.now() > gameState.shieldEndTime) {
+                gameState.shieldActive = false;
+            }
+
+            gameState.bullets = gameState.bullets.filter(bullet => {
+                bullet.x += bullet.speed;
+                bullet.y += bullet.vy;
+                return bullet.x < canvas.width + bullet.width && bullet.y > 0 && bullet.y < canvas.height;
+            });
+
+            gameState.enemyBullets = gameState.enemyBullets.filter(bullet => {
+                bullet.x -= bullet.speed;
+                
+                if (checkCollision(bullet, gameState.player)) {
+                    takeDamage();
+                    return false;
+                }
+                
+                return bullet.x > -bullet.width;
+            });
+
+            if (timestamp - gameState.lastEnemySpawn > gameState.enemySpawnInterval) {
+                spawnEnemy();
+                spawnPowerup();
+                gameState.lastEnemySpawn = timestamp;
+                gameState.enemySpawnInterval = Math.max(300, 600 - score * 2);
+            }
+
+            gameState.enemies = gameState.enemies.filter(enemy => {
+                enemy.x -= enemy.speed;
+                
+                if (enemy.type === 'fast') {
+                    enemy.y += enemy.vy * enemy.direction;
+                    if (enemy.y <= 0 || enemy.y >= canvas.height - enemy.height) {
+                        enemy.direction *= -1;
+                    }
+                }
+                
+                if (enemy.x > 100 && enemy.x < canvas.width - 100) {
+                    enemy.shootTimer += 16;
+                    if (enemy.shootTimer >= enemy.shootInterval) {
+                        enemyShoot(enemy);
+                        enemy.shootTimer = 0;
+                    }
+                }
+                
+                if (checkCollision(enemy, gameState.player)) {
+                    takeDamage();
+                    return false;
+                }
+                
+                return enemy.x > -enemy.width;
+            });
+
+            gameState.powerups = gameState.powerups.filter(powerup => {
+                powerup.x -= powerup.speed;
+                
+                if (checkCollision(powerup, gameState.player)) {
+                    gameState.powerupActive = true;
+                    gameState.powerupEndTime = Date.now() + 5000;
+                    return false;
+                }
+                
+                return powerup.x > -powerup.width;
+            });
+
+            gameState.shields = gameState.shields.filter(shield => {
+                shield.x -= shield.speed;
+                
+                if (checkCollision(shield, gameState.player)) {
+                    gameState.shieldActive = true;
+                    gameState.shieldEndTime = Date.now() + 8000;
+                    return false;
+                }
+                
+                return shield.x > -shield.width;
+            });
+
+            gameState.bullets = gameState.bullets.filter(bullet => {
+                let bulletActive = true;
+                gameState.enemies = gameState.enemies.filter(enemy => {
+                    if (bulletActive && checkCollision(bullet, enemy)) {
+                        bulletActive = false;
+                        
+                        if (enemy.type === 'tank') {
+                            enemy.health--;
+                            if (enemy.health <= 0) {
+                                score += 50;
+                                scoreEl.textContent = score;
+                                return false;
+                            }
+                            return true;
+                        } else if (enemy.type === 'fast') {
+                            score += 30;
+                            scoreEl.textContent = score;
+                            return false;
+                        } else {
+                            score += 15;
+                            scoreEl.textContent = score;
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+                return bulletActive;
+            });
+
+            draw(timestamp);
+            requestAnimationFrame(updateGame);
+        }
+
+        function draw(timestamp) {
+            ctx.fillStyle = '#0a0a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < 80; i++) {
+                const x = (i * 137 - timestamp * 0.05) % canvas.width;
+                const y = (i * 197) % canvas.height;
+                ctx.fillRect(x, y, 2, 2);
+            }
+
+            if (!gameState.invincible || Math.floor(timestamp / 100) % 2 === 0) {
+                ctx.fillStyle = gameState.powerupActive ? '#00ffff' : '#00ff88';
+                ctx.beginPath();
+                ctx.moveTo(gameState.player.x + gameState.player.width, gameState.player.y + gameState.player.height / 2);
+                ctx.lineTo(gameState.player.x, gameState.player.y);
+                ctx.lineTo(gameState.player.x, gameState.player.y + gameState.player.height);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Draw shield around player
+            if (gameState.shieldActive) {
+                ctx.strokeStyle = '#fbbf24';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(
+                    gameState.player.x + gameState.player.width / 2,
+                    gameState.player.y + gameState.player.height / 2,
+                    40,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.stroke();
+                
+                // Rotating shield effect
+                ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(
+                    gameState.player.x + gameState.player.width / 2,
+                    gameState.player.y + gameState.player.height / 2,
+                    35,
+                    timestamp * 0.003,
+                    timestamp * 0.003 + Math.PI
+                );
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = gameState.powerupActive ? '#00ffff' : '#ffff00';
+            gameState.bullets.forEach(bullet => {
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+
+            ctx.fillStyle = '#ff0066';
+            gameState.enemyBullets.forEach(bullet => {
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+
+            gameState.enemies.forEach(enemy => {
+                if (enemy.type === 'normal') {
+                    ctx.fillStyle = '#ff3366';
+                } else if (enemy.type === 'fast') {
+                    ctx.fillStyle = '#ff9933';
+                } else if (enemy.type === 'tank') {
+                    ctx.fillStyle = '#9933ff';
+                }
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                
+                if (enemy.type === 'tank') {
+                    ctx.fillStyle = '#00ff00';
+                    const healthBarWidth = (enemy.width / 5) * enemy.health;
+                    ctx.fillRect(enemy.x, enemy.y - 10, healthBarWidth, 5);
+                }
+            });
+
+            ctx.fillStyle = '#00ffff';
+            gameState.powerups.forEach(powerup => {
+                ctx.fillRect(powerup.x, powerup.y, powerup.width, powerup.height);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('3x', powerup.x + powerup.width / 2, powerup.y + powerup.height / 2 + 7);
+                ctx.fillStyle = '#00ffff';
+            });
+
+            // Draw shield powerups
+            ctx.fillStyle = '#fbbf24';
+            gameState.shields.forEach(shield => {
+                ctx.fillRect(shield.x, shield.y, shield.width, shield.height);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(shield.x + shield.width / 2, shield.y + shield.height / 2, 12, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = '#fbbf24';
+            });
+        }
+
+        function resetGame() {
+            gameState.player = { x: 50, y: 275, width: 50, height: 50, speed: 8 };
+            gameState.bullets = [];
+            gameState.enemies = [];
+            gameState.enemyBullets = [];
+            gameState.powerups = [];
+            gameState.shields = [];
+            gameState.keys = {};
+            gameState.lastEnemySpawn = 0;
+            gameState.enemySpawnInterval = 600;
+            gameState.lastShot = 0;
+            gameState.powerupActive = false;
+            gameState.shieldActive = false;
+            gameState.invincible = false;
+            
+            score = 0;
+            lives = 10;
+            gameOver = false;
+            
+            scoreEl.textContent = score;
+            livesEl.textContent = lives;
+            gameOverEl.classList.remove('show');
+            
+            requestAnimationFrame(updateGame);
+        }
+
+        requestAnimationFrame(updateGame);
+    </script>
+</body>
+</html>
